@@ -266,11 +266,11 @@ verify_and_update_request(FirmwareContext *in_ctx)
 static sse_int
 done_download_firmware(sse_int in_err, FirmwareContext *in_ctx)
 {
-	SSEEventService *es;
+	MoatEventService *es;
 	sse_int err;
 
-	es = ssep_event_service_get_instance();
-	sse_event_service_unsubscribe(es, SSE_EVENT_IO_READY, handle_io_ready_proc);
+	es = moat_event_service_get_instance();
+	moat_event_service_unsubscribe(es, MOAT_EVENT_IO_READY, handle_io_ready_proc);
 	if (in_err) {
 		goto error_exit;
 	}
@@ -377,7 +377,7 @@ downloadinfo_download_and_update_proc(Moat in_moat, sse_char *in_uid, sse_char *
 	MoatObject *info = ctx->CurrentInfo;
 	MoatHttpClient *http = NULL;
 	MoatHttpRequest *req;
-	SSEEventService *es;
+	MoatEventService *es;
 	sse_char *p;
 	sse_uint len;
 	sse_bool opt;
@@ -425,8 +425,8 @@ downloadinfo_download_and_update_proc(Moat in_moat, sse_char *in_uid, sse_char *
 		goto error_exit;
 	}
 	/* IO_READYイベント購読開始 */
-	es = ssep_event_service_get_instance();
-	err = sse_event_service_subscribe(es, SSE_EVENT_IO_READY, handle_io_ready_proc, ctx);
+	es = moat_event_service_get_instance();
+	err = moat_event_service_subscribe(es, MOAT_EVENT_IO_READY, handle_io_ready_proc, ctx);
 	if (err) {
 		goto error_exit;
 	}
