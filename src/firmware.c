@@ -23,6 +23,8 @@
  *			サーバからのファームウェア更新要求を受け、ファームウェアをダウンロードし、ファームウェア更新を実行するMOATアプリケーション。
  */
 
+#include <servicesync/moat.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -30,9 +32,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ev.h>
-#include <servicesync/client.h>		/* PDK */
-#include <servicesync/auxlibs.h>	/* PDK */
-#include "ssepimpl.h"
 
 /*! ファームウェアファイルの一時保存先 */
 #define FW_DOWNLOAD_FILE			"/tmp/sse_fota.firm"
@@ -59,7 +58,7 @@ struct FirmwareContext_ {
 	sse_char *Urn;				/**< 自パッケージのURN(結果通知のID作成時に使用) */
 	MoatObject *CurrentInfo;	/**< 最新のダウンロード情報 */
 	sse_char *StatusFile;		/**< 結果情報ファイル(未使用) */
-	HttpClient *Http;			/**< HTTPクライアント */
+	MoatHttpClient *Http;			/**< HTTPクライアント */
 };
 
 static sse_int handle_io_ready_proc(sse_int in_event_id, sse_pointer in_data, sse_uint in_data_length, sse_pointer in_user_data);
@@ -74,7 +73,7 @@ static void
 clear_context(FirmwareContext *in_ctx)
 {
 	if (in_ctx->Http != NULL) {
-		http_client_free(in_ctx->Http);
+		moat_httpc_free(in_ctx->Http);
 		in_ctx->Http = NULL;
 	}
 	if (in_ctx->CurrentInfo != NULL) {
@@ -138,8 +137,7 @@ create_notification_id(sse_char *in_urn, sse_char *in_service_name)
  * @return	処理結果
  */
 static sse_int
-notify_result(sse_int in_err_code, sse_char *in_err_info,
-        FirmwareContext *in_ctx)
+notify_result(sse_int in_err_code, sse_char *in_err_info, FirmwareContext *in_ctx)
 {
 	sse_char *service_id = NULL;
 	MoatObject *info;
@@ -305,43 +303,43 @@ handle_io_ready_proc(sse_int in_event_id, sse_pointer in_data,
         sse_uint in_data_length, sse_pointer in_user_data)
 {
 	FirmwareContext *ctx = (FirmwareContext *)in_user_data;
-	HttpClient *http = ctx->Http;
-	HttpResponse *res = NULL;
+	MoatHttpClient *http = ctx->Http;
+	MoatHttpResponse *res = NULL;
 	sse_int status_code;
 	sse_int state;
 	sse_bool complete;
 	sse_int err = SSE_E_OK;
 
-	state = http_client_get_state(http);
-	if (state == HTTP_STATE_CONNECTING || state == HTTP_STATE_SENDING) {
-		err = http_client_do_send(http, &complete);
+	state = moat_httpc_get_state(http);
+	if (state == MOAT_HTTP_STATE_CONNECTING || state == MOAT_HTTP_STATE_SENDING) {
+		err = moat_httpc_do_send(http, &complete);
 		if (err != SSE_E_OK && err != SSE_E_AGAIN) {
-			LOG_ERROR("failed to http_client_do_send():err=[%d]", err);
+			LOG_ERROR("failed to moat_httpc_do_send():err=[%d]", err);
 			goto done;
 		}
 		if (complete) {
 			LOG_DEBUG("do recv");
-			err = http_client_recv_response(http);
+			err = moat_httpc_recv_response(http);
 			if (err != SSE_E_OK && err != SSE_E_AGAIN) {
-				LOG_ERROR("failed to http_client_recv_response()");
+				LOG_ERROR("failed to moat_httpc_recv_response()");
 				goto done;
 			}
 		}
-	} else if (state == HTTP_STATE_RECEIVING || state == HTTP_STATE_RECEIVED) {
-		err = http_client_do_recv(http, &complete);
+	} else if (state == MOAT_HTTP_STATE_RECEIVING || state == MOAT_HTTP_STATE_RECEIVED) {
+		err = moat_httpc_do_recv(http, &complete);
 		if (err != SSE_E_OK && err != SSE_E_AGAIN) {
-			LOG_ERROR("failed to http_client_do_recv():err=[%d]", err);
+			LOG_ERROR("failed to moat_httpc_do_recv():err=[%d]", err);
 			goto done;
 		}
 		if (complete) {
-			res = http_client_get_response(http);
+			res = moat_httpc_get_response(http);
 			if (res == NULL) {
 				err = SSE_E_GENERIC;
 				goto done;
 			}
-			err = http_response_get_status_code(res, &status_code);
+			err = moat_httpres_get_status_code(res, &status_code);
 			if (err) {
-				LOG_ERROR("failed to http_response_get_status_code() [%d]", err);
+				LOG_ERROR("failed to moat_httpres_get_status_code() [%d]", err);
 				goto done;
 			}
 			if (status_code != 200) {
@@ -377,8 +375,8 @@ downloadinfo_download_and_update_proc(Moat in_moat, sse_char *in_uid, sse_char *
 {
 	FirmwareContext *ctx = (FirmwareContext *)in_model_context;
 	MoatObject *info = ctx->CurrentInfo;
-	HttpClient *http = NULL;
-	HttpRequest *req;
+	MoatHttpClient *http = NULL;
+	MoatHttpRequest *req;
 	SSEEventService *es;
 	sse_char *p;
 	sse_uint len;
@@ -394,19 +392,19 @@ downloadinfo_download_and_update_proc(Moat in_moat, sse_char *in_uid, sse_char *
 		goto error_exit;
 	}
 	/* HTTPクライアント設定 */
-	http = http_client_new();
+	http = moat_httpc_new();
 	if (http == NULL) {
 		err = SSE_E_NOMEM;
 		goto error_exit;
 	}
 	/* ダウンロードコンテンツの圧縮を許容 */
 	opt = sse_true;
-	err = http_client_set_option(http, HTTP_OPT_ACCEPT_COMPRESSED, &opt, sizeof(sse_bool));
+	err = moat_httpc_set_option(http, MOAT_HTTP_OPT_ACCEPT_COMPRESSED, &opt, sizeof(sse_bool));
 	if (err) {
 		goto error_exit;
 	}
 	/* ダウンロード先のパス設定 */
-	err = http_client_set_download_file_path(http, FW_DOWNLOAD_FILE, sse_strlen(FW_DOWNLOAD_FILE));
+	err = moat_httpc_set_download_file_path(http, FW_DOWNLOAD_FILE, sse_strlen(FW_DOWNLOAD_FILE));
 	if (err) {
 		goto error_exit;
 	}
@@ -416,13 +414,13 @@ downloadinfo_download_and_update_proc(Moat in_moat, sse_char *in_uid, sse_char *
 		goto error_exit;
 	}
 	/* 取得したURLへのGETリクエスト生成 */
-	req = http_client_create_request(http, HTTP_METHOD_GET, p, len);
+	req = moat_httpc_create_request(http, MOAT_HTTP_METHOD_GET, p, len);
 	if (req == NULL) {
 		err = SSE_E_GENERIC;
 		goto error_exit;
 	}
 	/* GETリクエスト送信 */
-	err = http_client_send_request(http, req);
+	err = moat_httpc_send_request(http, req);
 	if (err) {
 		goto error_exit;
 	}
@@ -438,7 +436,7 @@ downloadinfo_download_and_update_proc(Moat in_moat, sse_char *in_uid, sse_char *
 error_exit:
 
 	if (http != NULL) {
-		http_client_free(http);
+		moat_httpc_free(http);
 	}
 	moat_object_free(info);
 	ctx->CurrentInfo = NULL;
