@@ -1,0 +1,16 @@
+.DS_Store
+*~
+*.swp
+*.log
+*.orig
+(.*/)?\#[^/]*\#$
+config.gypi
+config.mk
+out/*
+certs/*.key
+certs/*.keystore
+certs/*.p12
+certs/*.pem
+tools/*.pyc
+package/*.bin
+*.zip
