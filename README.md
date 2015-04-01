@@ -90,6 +90,6 @@ $ make package
 
 ## 変更履歴
 
-Changes in `0.0.1` : 2015/03/22
+Changes in `0.0.1` : 2015/04/01
 
 * Initial Release.
