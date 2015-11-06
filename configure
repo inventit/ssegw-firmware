@@ -186,8 +186,6 @@ def generate_skeleton(moat_path, package_name):
 def configure_moat(o):
   moat_path = moatutils.pathinfo(moat_root)
 
-  o['variables']['root'] = moat_root
-
   token_path = options.token_path
   if not token_path:
     token_path = os.path.join(moat_path.RESOURCES_PATH, 'token.bin')

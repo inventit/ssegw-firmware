@@ -205,6 +205,7 @@ class package:
       maintainers = collections.OrderedDict({ 'name' : '[name]', 'email' : '[email]'})
       meta['maintainers'] = [maintainers]
       meta['bugs'] = collections.OrderedDict({ 'mail' : '[email]'})
+      meta['dependencies'] = collections.OrderedDict({ 'moat' : '>=1.0.0 <2.0.0'})
       meta['main'] = self.package_name + '.so'
       meta['models'] = collections.OrderedDict({})
       data = json.dumps(meta, sort_keys=False, indent=4, separators=(',', ' : '))
@@ -218,6 +219,9 @@ class package:
 \t],
 \t"bugs" : {
 \t\t"mail" : "[email]"
+\t},
+\t"dependencies" : {
+\t\t"moat" : ">=1.0.0 <2.0.0"
 \t},
 \t"main" : "%s.so",
 \t"models" : {}

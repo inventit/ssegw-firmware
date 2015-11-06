@@ -30,6 +30,7 @@
 #include <servicesync/sse/ssestring.h>
 #include <servicesync/sse/ssehashlib.h>
 #include <servicesync/sse/ssebase64.h>
+#include <servicesync/sse/sseversion.h>
 #include <servicesync/moat/moatvalue.h>
 #include <servicesync/moat/moatapi.h>
 #include <servicesync/moat/moatapp.h>

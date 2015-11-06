@@ -130,6 +130,18 @@ MOAT_API sse_int moat_value_to_json_string(MoatValue *self, sse_char *out_json, 
 MOAT_API sse_int moat_object_to_stream(MoatObject *self, sse_byte *out_stream, sse_uint *out_size);
 MOAT_API sse_int moat_object_to_json_string(MoatObject *self, sse_char *out_json, sse_uint *out_len);
 
+MOAT_API void moat_value_dump(MoatValue *self, sse_int in_category, const sse_char* in_type, const sse_char* in_tag, const sse_char* in_func, sse_int in_line, void (*in_logger)(sse_int, const sse_char*, ...));
+#define MOAT_VALUE_DUMP_ERROR(tag, self) moat_value_dump(self, SSE_LOG_LEVEL_ERROR, SSE_LOG_LABEL_ERROR, tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+#define MOAT_VALUE_DUMP_WARN(tag, self)  moat_value_dump(self, SSE_LOG_LEVEL_WARN,  SSE_LOG_LABEL_WARN,  tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+#define MOAT_VALUE_DUMP_INFO(tag, self)  moat_value_dump(self, SSE_LOG_LEVEL_INFO,  SSE_LOG_LABEL_INFO,  tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+#define MOAT_VALUE_DUMP_DEBUG(tag, self) moat_value_dump(self, SSE_LOG_LEVEL_DEBUG, SSE_LOG_LABEL_DEBUG, tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+
+MOAT_API void moat_object_dump(MoatObject *self, sse_int in_category, const sse_char* in_type, const sse_char* in_tag, const sse_char* in_func, sse_int in_line, void (*in_logger)(sse_int, const sse_char*, ...));
+#define MOAT_OBJECT_DUMP_ERROR(tag, self) moat_object_dump(self, SSE_LOG_LEVEL_ERROR, SSE_LOG_LABEL_ERROR, tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+#define MOAT_OBJECT_DUMP_WARN(tag, self)  moat_object_dump(self, SSE_LOG_LEVEL_WARN,  SSE_LOG_LABEL_WARN,  tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+#define MOAT_OBJECT_DUMP_INFO(tag, self)  moat_object_dump(self, SSE_LOG_LEVEL_INFO,  SSE_LOG_LABEL_INFO,  tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+#define MOAT_OBJECT_DUMP_DEBUG(tag, self) moat_object_dump(self, SSE_LOG_LEVEL_DEBUG, SSE_LOG_LABEL_DEBUG, tag, __FUNCTION__, __LINE__, ssep_app_log_print)
+
 SSE_END_C_DECLS
 
 #endif /* MOATVALUE_H_ */

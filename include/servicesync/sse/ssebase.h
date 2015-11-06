@@ -50,6 +50,8 @@ typedef sse_int (*SSECompareProc)(sse_pointer a, sse_pointer b);
 #define SSE_E_NOTCONN		(-12)
 #define SSE_E_PROTO			(-13)
 
+const sse_char * sse_get_error_string(sse_int in_code);
+
 #define SSE_INT16_MIN	(-32767 - 1)
 #define SSE_INT16_MAX	(32767)
 #define SSE_UINT16_MAX	(0xFFFF)
@@ -77,6 +79,7 @@ enum sse_log_level {
 #define SSE_LOG_LABEL_DEBUG	"DEBUG"
 #define SSE_LOG_LABEL_TRACE	"TRACE"
 
+extern void ssep_log_print(sse_int level, const sse_char *format, ...); // To privent -Wimplicit-function-declaration
 #define SSE_LOG(category, type, tag, format, ...)	ssep_log_print(category, "[" type "] " tag " %s():L%d " format, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 
 #ifdef SSE_LOG_ENABLE_ERROR
