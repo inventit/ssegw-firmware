@@ -14,3 +14,4 @@ certs/*.pem
 tools/*.pyc
 package/*.bin
 *.zip
+.editorconfig
