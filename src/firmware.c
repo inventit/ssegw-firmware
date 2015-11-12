@@ -16,7 +16,6 @@
  */
 
 #include <servicesync/moat.h>
-#include "firmware/download_info_model.h"
 #include "firmware/firmware_updater.h"
 
 #define TAG	"firmware"

@@ -14,14 +14,16 @@
  * JAPAN
  * http://www.yourinventit.com/
  */
+#include <limits.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
 
 #include <servicesync/moat.h>
-#include "download_info_model.h"
+
 #include "firmware_updater.h"
 
 #define TAG "FirmwareUpdater"
-
-#define FW_DOWNLOAD_FILE  "./tmp.bin"
 
 /* FirmwareUpdater private */
 
@@ -36,32 +38,107 @@ TFirmwareUpdater_Clear(TFirmwareUpdater *self)
     sse_free(self->fAsyncKey);
     self->fAsyncKey = NULL;
   }
+  if (self->fPackage != NULL) {
+    TFirmwarePackage_Delete(self->fPackage);
+    self->fPackage = NULL;
+  }
+}
+
+static sse_int
+TFirmwareUpdater_HandleExtractResult(TFirmwareUpdater *self, sse_int in_err, sse_char *in_err_info)
+{
+  sse_int err = in_err;
+
+  if (self->fAsyncKey == NULL) {
+    return SSE_E_INVAL;
+  }
+  if (in_err != SSE_E_OK) {
+    TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, err, in_err_info);
+    TFirmwareUpdater_Clear(self);
+  } else {
+    // TODO!
+    TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, err, in_err_info);
+    TFirmwareUpdater_Clear(self);
+  }
+  return err;
+}
+
+static sse_int
+FirmwareUpdater_OnExtracted(TFirmwarePackage *package, sse_int in_err, sse_char *in_err_info, sse_pointer in_user_data)
+{
+  int err;
+  err = TFirmwareUpdater_HandleExtractResult((TFirmwareUpdater *)in_user_data, in_err, in_err_info);
+  MOAT_LOG_DEBUG(TAG, "in_err=%d, in_err_info=%s, err=%d", in_err, in_err_info, err);
+  return err;
+}
+
+static sse_int
+TFirmwareUpdater_ExtractPackage(TFirmwareUpdater *self)
+{
+  TFirmwarePackage *package = NULL;
+  sse_int err;
+
+  package = FirmwarePackage_New();
+  if (package == NULL) {
+    MOAT_LOG_DEBUG(TAG, "failed to FirmwarePackage_New().");
+    return SSE_E_NOMEM;
+  }
+  err = TFirmwarePackage_Extract(package, FirmwareUpdater_OnExtracted, self);
+  if (err != SSE_E_OK) {
+    goto error_exit;
+  }
+  self->fPackage = package;
+  return SSE_E_OK;
+
+error_exit:
+  if (package != NULL) {
+    TFirmwarePackage_Delete(package);
+  }
+  return err;
 }
 
 static sse_int
 TFirmwareUpdater_HandleDownloadResult(TFirmwareUpdater *self, sse_int in_err)
 {
+  sse_int err = in_err;
+  sse_char *err_info = "";
   if (self->fAsyncKey == NULL) {
     return SSE_E_INVAL;
   }
-  /* TODO */
-  TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, in_err, "");
-  return SSE_E_OK;
+  if (self->fDownloader != NULL) {
+    moat_downloader_free(self->fDownloader);
+    self->fDownloader = NULL;
+  }
+  if (err != SSE_E_OK) {
+    err_info = "Failed to download package";
+  } else {
+    err = TFirmwareUpdater_ExtractPackage(self);
+    if (err != SSE_E_OK) {
+      err_info = "Failed to extract package.";
+    }
+  }
+  if (err != SSE_E_OK) {
+    TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, err, err_info);
+    TFirmwareUpdater_Clear(self);
+  }
+  return err;
 }
 
 static void
 FirmwareUpdater_OnDownloaded(MoatDownloader *in_dl, sse_bool in_canceled, sse_pointer in_user_data)
 {
+  int err;
   int result = in_canceled ? SSE_E_INTR : SSE_E_OK;
-  int err = TFirmwareUpdater_HandleDownloadResult((TFirmwareUpdater *)in_user_data, result);
+  err = TFirmwareUpdater_HandleDownloadResult((TFirmwareUpdater *)in_user_data, result);
   MOAT_LOG_DEBUG(TAG, "err=%d", err);
 }
 
 static void
 FirmwareUpdater_OnDownloadError(MoatDownloader *in_dl, sse_int in_err_code, sse_pointer in_user_data)
 {
-  int err = TFirmwareUpdater_HandleDownloadResult((TFirmwareUpdater *)in_user_data, in_err_code);
-	MOAT_LOG_DEBUG(TAG, "err=%d", err);
+  int err;
+  err = TFirmwareUpdater_HandleDownloadResult((TFirmwareUpdater *)in_user_data, in_err_code);
+  MOAT_LOG_DEBUG(TAG, "err=%d", err);
 }
 
 static sse_int
@@ -71,22 +148,31 @@ FirmwareUpdater_OnDownloadAndUpdate(TDownloadInfoModel *in_info, sse_char *in_ke
   MoatObject *info_obj = NULL;
   MoatDownloader *downloader = NULL;
   sse_char *key;
-  sse_char *p;
-  sse_uint len;
+  sse_char *url;
+  sse_uint url_len;
+  sse_char *file_path = NULL;
   sse_int err = SSE_E_INVAL;
 
   key = sse_strdup(in_key);
   if (key == NULL) {
+    MOAT_LOG_ERROR(TAG, "failed to duplicate key.");
     err = SSE_E_NOMEM;
     goto error_exit;
   }
   info_obj = TDownloadInfoModel_GetModelObject(in_info);
   if (info_obj == NULL) {
+    MOAT_LOG_ERROR(TAG, "failed to TDownloadInfoModel_GetModelObject()");
     err = SSE_E_INVAL;
     goto error_exit;
   }
-  err = moat_object_get_string_value(info_obj, "url", &p, &len);
+  err = moat_object_get_string_value(info_obj, "url", &url, &url_len);
   if (err) {
+    MOAT_LOG_ERROR(TAG, "failed to get url.");
+    goto error_exit;
+  }
+  file_path = FirmwarePackage_GetPackageFilePath();
+  if (file_path == NULL) {
+    MOAT_LOG_ERROR(TAG, "failed to download path.");
     goto error_exit;
   }
   downloader = moat_downloader_new();
@@ -95,7 +181,8 @@ FirmwareUpdater_OnDownloadAndUpdate(TDownloadInfoModel *in_info, sse_char *in_ke
     goto error_exit;
   }
   moat_downloader_set_callbacks(downloader, FirmwareUpdater_OnDownloaded, FirmwareUpdater_OnDownloadError, updater);
-  err = moat_downloader_download(downloader, p, len, FW_DOWNLOAD_FILE);
+  unlink(file_path);
+  err = moat_downloader_download(downloader, url, url_len, file_path);
   if (err) {
     goto error_exit;
   }
@@ -106,6 +193,9 @@ FirmwareUpdater_OnDownloadAndUpdate(TDownloadInfoModel *in_info, sse_char *in_ke
 error_exit:
   if (downloader != NULL) {
     moat_downloader_free(downloader);
+  }
+  if (file_path != NULL) {
+    sse_free(file_path);
   }
   TFirmwareUpdater_Clear(updater);
   TDownloadInfoModel_Clear(&updater->fInfo);

@@ -15,3 +15,4 @@ tools/*.pyc
 package/*.bin
 *.zip
 .editorconfig
+test/x86_64/*

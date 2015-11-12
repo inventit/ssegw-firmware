@@ -15,6 +15,7 @@
         '<@(sseutils_src)',
         'src/<(package_name).c',
         'src/firmware/download_info_model.c',
+        'src/firmware/firmware_package.c',
         'src/firmware/firmware_updater.c',
        ],
       'product_prefix': '',

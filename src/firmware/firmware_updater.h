@@ -17,6 +17,11 @@
 #ifndef __FIRMWARE_UPDATER__
 #define __FIRMWARE_UPDATER__
 
+#include <sseutils.h>
+#include "download_info_model.h"
+#include "firmware_package.h"
+#include "firmware_package.h"
+
 SSE_BEGIN_C_DECLS
 
 typedef struct TFirmwareUpdater_ TFirmwareUpdater;
@@ -26,6 +31,7 @@ struct TFirmwareUpdater_ {
   TDownloadInfoModel fInfo;
   sse_char *fAsyncKey;
   MoatDownloader *fDownloader;
+  TFirmwarePackage *fPackage;
 };
 
 sse_int TFirmwareUpdater_Initialize(TFirmwareUpdater *self, Moat in_moat);
