@@ -1,6 +1,6 @@
 {
-  "url" : "https://github.com/inventit/moat-c-sdk/archive/master.zip",
-  "name" : "moat-c-sdk.zip",
-  "version" : "1.0.4"
+  "url" : "http://127.0.0.1:8000/static/fwapprunner_test_001.zip",
+  "name" : "fwapprunner_test_001",
+  "version" : "0.0.3"
 }
 

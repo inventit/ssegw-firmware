@@ -23,19 +23,23 @@ SSE_BEGIN_C_DECLS
 
 typedef struct TFirmwarePackage_ TFirmwarePackage;
 
-typedef sse_int (*FirmwarePackage_ExtractCallback)(TFirmwarePackage *package, sse_int in_err, sse_char *in_err_info, sse_pointer in_user_data);
+typedef sse_int (*FirmwarePackage_CommandCallback)(TFirmwarePackage *package, sse_int in_err, sse_char *in_err_info, sse_pointer in_user_data);
+
 struct TFirmwarePackage_ {
   sse_int fState;
   sse_char *fPackageFilePath;
   sse_char *fPackageDirPath;
-  TSseUtilShellCommand fExtractCommand;
-  FirmwarePackage_ExtractCallback fExtractCallback;
-  sse_pointer fExtractUserData;
+  TSseUtilShellCommand *fCurrentCommand;
+  FirmwarePackage_CommandCallback fCommandCallback;
+  sse_pointer fCommandUserData;
 };
 
 TFirmwarePackage * FirmwarePackage_New(void);
 void TFirmwarePackage_Delete(TFirmwarePackage *self);
-sse_int TFirmwarePackage_Extract(TFirmwarePackage *self, FirmwarePackage_ExtractCallback in_callback, sse_pointer in_user_data);
+sse_int TFirmwarePackage_Extract(TFirmwarePackage *self, FirmwarePackage_CommandCallback in_callback, sse_pointer in_user_data);
+sse_bool TFirmwarePackage_Verify(TFirmwarePackage *self);
+sse_int TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self);
+sse_int TFirmwarePackage_CheckResult(TFirmwarePackage *self, FirmwarePackage_CommandCallback in_callback, sse_pointer in_user_data);
 
 sse_char * FirmwarePackage_GetPackageFilePath(void);
 sse_char * FirmwarePackage_GetPackageDirPath(void);

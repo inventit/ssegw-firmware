@@ -22,7 +22,7 @@ SSE_BEGIN_C_DECLS
 #define DOWNLOAD_INFO_MODEL_NAME  "DownloadInfo"
 #define DOWNLOAD_INFO_MODEL_FIELD_URL  "url"
 #define DOWNLOAD_INFO_MODEL_FIELD_NAME  "name"
-#define DOWNLOAD_INFO_MODEL_FIELD_VERSION  "name"
+#define DOWNLOAD_INFO_MODEL_FIELD_VERSION  "version"
 #define DOWNLOAD_INFO_MODEL_FIELD_STATUS  "status"
 #define DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO  "errorInfo"
 
@@ -42,6 +42,7 @@ sse_int TDownloadInfoModel_Start(TDownloadInfoModel *self);
 void TDownloadInfoModel_Stop(TDownloadInfoModel *self);
 void TDownloadInfoModel_SetDownloadAndUpdateCommandCallback(TDownloadInfoModel *self, DownloadInfoModel_DownloadAndUpdateCommandCallback in_callback, sse_pointer in_user_data);
 MoatObject * TDownloadInfoModel_GetModelObject(TDownloadInfoModel *self);
+sse_int TDownloadInfoModel_SetModelObject(TDownloadInfoModel *self, MoatObject *in_obj);
 sse_int TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_int in_err_code, sse_char *in_err_info);
 void TDownloadInfoModel_Clear(TDownloadInfoModel *self);
 

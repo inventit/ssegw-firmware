@@ -22,6 +22,22 @@
 
 /* DownloadInfoModel private */
 static sse_int
+DownloadInfoModel_CopyObjectField(MoatObject *in_src, MoatObject *in_dst, sse_char *in_key)
+{
+  MoatValue *value;
+  sse_int err;
+  value = moat_object_get_value(in_src, in_key);
+  if (value != NULL) {
+    err = moat_object_add_value(in_dst, in_key, value, sse_true, sse_true);
+    if (err != SSE_E_OK) {
+      MOAT_LOG_ERROR(TAG, "failed to moat_object_add_value(%s).", in_key);
+      return err;
+    }
+  }
+  return SSE_E_OK;
+}
+
+static sse_int
 DownloadInfoModel_OnDownloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *in_key, MoatValue *in_data, sse_pointer in_model_context)
 {
   TDownloadInfoModel *model= (TDownloadInfoModel *)in_model_context;
@@ -120,6 +136,7 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
   sse_int req_id;
 
   if (self->fCurrentInfo == NULL) {
+    MOAT_LOG_ERROR(TAG, "Current object is nil.");
     return SSE_E_INVAL;
   }
   service_id = moat_create_notification_id_with_moat(self->fMoat, "update-result", "1.0");
@@ -134,22 +151,22 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
   } else {
     status = "UPDATED";
   }
-  err = moat_object_add_string_value(info, "status", status, 0, sse_true, sse_true);
+  err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_STATUS, status, 0, sse_true, sse_true);
   if (err) {
     goto error_exit;
   }
   if (err_info != NULL) {
-    err = moat_object_add_string_value(info, "errorInfo", err_info, 0, sse_true, sse_true);
+    err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO, err_info, 0, sse_true, sse_true);
     if (err) {
       goto error_exit;
     }
   }
   /* for reduce value size : set url value "" */
-  err = moat_object_add_string_value(info, "url", "", 0, sse_true, sse_true);
+  err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_URL, "", 0, sse_true, sse_true);
   if (err) {
     goto error_exit;
   }
-  req_id = moat_send_notification(self->fMoat, service_id, in_key, "DownloadInfo", info, NULL, NULL);
+  req_id = moat_send_notification(self->fMoat, service_id, in_key, DOWNLOAD_INFO_MODEL_NAME, info, NULL, NULL);
   if (req_id < 0) {
     err = req_id;
   } else {
@@ -169,6 +186,58 @@ MoatObject *
 TDownloadInfoModel_GetModelObject(TDownloadInfoModel *self)
 {
   return self->fCurrentInfo;
+}
+
+sse_int
+TDownloadInfoModel_SetModelObject(TDownloadInfoModel *self, MoatObject *in_obj)
+{
+  MoatObject *obj = NULL;
+  sse_char *p;
+  sse_uint len;
+  sse_int err;
+
+  err = moat_object_get_string_value(in_obj, DOWNLOAD_INFO_MODEL_FIELD_URL, &p, &len);
+  if (err != SSE_E_OK) {
+    MOAT_LOG_ERROR(TAG, "%s is missing.", DOWNLOAD_INFO_MODEL_FIELD_URL);
+    return err;
+  }
+  obj = moat_object_new();
+  if (obj == NULL) {
+    MOAT_LOG_ERROR(TAG, "failed to moat_object_new().");
+    return SSE_E_NOMEM;
+  }
+  err = moat_object_add_string_value(obj, DOWNLOAD_INFO_MODEL_FIELD_URL, p, len, sse_true, sse_true);
+  if (err != SSE_E_OK) {
+    MOAT_LOG_ERROR(TAG, "failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
+    goto error_exit;
+  }
+  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_NAME);
+  if (err != SSE_E_OK) {
+    goto error_exit;
+  }
+  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_VERSION);
+  if (err != SSE_E_OK) {
+    goto error_exit;
+  }
+  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_STATUS);
+  if (err != SSE_E_OK) {
+    goto error_exit;
+  }
+  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
+  if (err != SSE_E_OK) {
+    goto error_exit;
+  }
+  if (self->fCurrentInfo != NULL) {
+    moat_object_free(self->fCurrentInfo);
+  }
+  self->fCurrentInfo = obj;
+  return SSE_E_OK;
+
+error_exit:
+  if (obj != NULL) {
+    moat_object_free(obj);
+  }
+  return err;
 }
 
 void
