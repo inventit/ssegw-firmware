@@ -56,7 +56,7 @@ class token:
     except ValueError:
       print 'decoding JSON has failed'
       return False
- 
+
 #    print self.json.get('applicationId')
 #    print self.json.get('packageId')
     if not self.json.get('applicationId') or not self.json.get('packageId'):
@@ -133,7 +133,7 @@ class keystore:
     return True
 
   def export_pkcs12(self):
-    
+
     if not os.path.isfile(self.path):
       return False
     if os.path.isfile(self.p12_path):
@@ -257,8 +257,8 @@ class package:
       f.close()
     return True
 
-  def archive(self, path, arch):
-    pkg_path = os.path.join(self.deploy_to, self.package_name + '_' + self.version + '_' + arch + '.zip')
+  def archive(self, path, arch, product='generic'):
+    pkg_path = os.path.join(self.deploy_to, self.package_name + '_' + self.version + '_' + arch + '_' + product + '.zip')
     print 'archinving to %s' %(pkg_path)
     cwd = os.getcwd()
     os.chdir(path)
