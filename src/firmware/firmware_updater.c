@@ -24,6 +24,13 @@
 #include "firmware_updater.h"
 
 #define TAG "FirmwareUpdater"
+
+#define TRACE_ENTER() MOAT_LOG_TRACE(TAG, "== enter =>");
+#define TRACE_LEAVE() MOAT_LOG_TRACE(TAG, "<= leave ==");
+#define LOG_ERROR(format, ...)  MOAT_LOG_ERROR(TAG, format, ##__VA_ARGS__)
+#define LOG_INFO(format, ...) MOAT_LOG_INFO(TAG, format, ##__VA_ARGS__)
+#define LOG_DEBUG(format, ...)  MOAT_LOG_DEBUG(TAG, format, ##__VA_ARGS__)
+
 #define FW_UPDATE_ASYNC_KEY "@asyncKey"
 #define FW_UPDATE_STORED_CONTEXT_KEY  "FirmwareUpdateContext"
 
@@ -32,6 +39,7 @@
 static void
 TFirmwareUpdater_Clear(TFirmwareUpdater *self)
 {
+  TRACE_ENTER();
   if (self->fDownloader != NULL) {
     moat_downloader_free(self->fDownloader);
     self->fDownloader = NULL;
@@ -44,11 +52,13 @@ TFirmwareUpdater_Clear(TFirmwareUpdater *self)
     TFirmwarePackage_Delete(self->fPackage);
     self->fPackage = NULL;
   }
+  TRACE_LEAVE();
 }
 
 static sse_int
 TFirmwareUpdater_PrepareUpdate(TFirmwareUpdater *self)
 {
+  TRACE_ENTER();
   MoatObject *obj = NULL;
   MoatObject *context = NULL;
   sse_int err;
@@ -56,21 +66,22 @@ TFirmwareUpdater_PrepareUpdate(TFirmwareUpdater *self)
   obj = TDownloadInfoModel_GetModelObject(&self->fInfo);
   context = moat_object_clone(obj);
   if (context == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to clone DownloadInfo.");
+    LOG_ERROR("failed to clone DownloadInfo.");
     err = SSE_E_NOMEM;
     goto error_exit;
   }
   err = moat_object_add_string_value(context, FW_UPDATE_ASYNC_KEY, self->fAsyncKey, 0, sse_true, sse_true);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to add AsyncKey value.");
+    LOG_ERROR("failed to add AsyncKey value.");
     goto error_exit;
   }
   err = moat_datastore_save_object(self->fMoat, FW_UPDATE_STORED_CONTEXT_KEY, context);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to save context.");
+    LOG_ERROR("failed to save context.");
     goto error_exit;
   }
   moat_object_free(context);
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
@@ -87,9 +98,10 @@ TFirmwareUpdate_UpdateFirmware(TFirmwareUpdater *self)
   sse_char *err_info = "";
   sse_bool ok;
 
+  TRACE_ENTER();
   ok = TFirmwarePackage_Verify(self->fPackage);
   if (!ok) {
-    MOAT_LOG_ERROR(TAG, "failed to TFirmwarePackage_Verify().");
+    LOG_ERROR("failed to TFirmwarePackage_Verify().");
     err_info = "Invalid package or state.";
     goto error_exit;
   }
@@ -103,6 +115,7 @@ TFirmwareUpdate_UpdateFirmware(TFirmwareUpdater *self)
     err_info = "Failed to update.";
     goto error_exit;
   }
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
@@ -116,8 +129,9 @@ TFirmwareUpdater_HandleExtractResult(TFirmwareUpdater *self, sse_int in_err, sse
 {
   sse_int err = in_err;
 
+  TRACE_ENTER();
   if (self->fAsyncKey == NULL) {
-    MOAT_LOG_ERROR(TAG, "AsyncKey is missing.");
+    LOG_ERROR("AsyncKey is missing.");
     return SSE_E_INVAL;
   }
   if (in_err != SSE_E_OK) {
@@ -126,6 +140,7 @@ TFirmwareUpdater_HandleExtractResult(TFirmwareUpdater *self, sse_int in_err, sse
   } else {
     TFirmwareUpdate_UpdateFirmware(self);
   }
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
@@ -133,8 +148,10 @@ static sse_int
 FirmwareUpdater_OnExtracted(TFirmwarePackage *package, sse_int in_err, sse_char *in_err_info, sse_pointer in_user_data)
 {
   int err;
+  TRACE_ENTER();
   err = TFirmwareUpdater_HandleExtractResult((TFirmwareUpdater *)in_user_data, in_err, in_err_info);
-  MOAT_LOG_DEBUG(TAG, "in_err=%d, in_err_info=%s, err=%d", in_err, in_err_info, err);
+  LOG_DEBUG("in_err=%d, in_err_info=%s, err=%d", in_err, in_err_info, err);
+  TRACE_LEAVE();
   return err;
 }
 
@@ -144,21 +161,24 @@ TFirmwareUpdater_ExtractPackage(TFirmwareUpdater *self)
   TFirmwarePackage *package = NULL;
   sse_int err;
 
+  TRACE_ENTER();
   package = FirmwarePackage_New();
   if (package == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to FirmwarePackage_New().");
+    LOG_ERROR("failed to FirmwarePackage_New().");
     return SSE_E_NOMEM;
   }
+  self->fPackage = package;
   err = TFirmwarePackage_Extract(package, FirmwareUpdater_OnExtracted, self);
   if (err != SSE_E_OK) {
     goto error_exit;
   }
-  self->fPackage = package;
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
   if (package != NULL) {
     TFirmwarePackage_Delete(package);
+    self->fPackage = NULL;
   }
   return err;
 }
@@ -168,6 +188,8 @@ TFirmwareUpdater_HandleDownloadResult(TFirmwareUpdater *self, sse_int in_err)
 {
   sse_int err = in_err;
   sse_char *err_info = "";
+
+  TRACE_ENTER();
   if (self->fAsyncKey == NULL) {
     return SSE_E_INVAL;
   }
@@ -187,6 +209,7 @@ TFirmwareUpdater_HandleDownloadResult(TFirmwareUpdater *self, sse_int in_err)
     TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, err, err_info);
     TFirmwareUpdater_Clear(self);
   }
+  TRACE_LEAVE();
   return err;
 }
 
@@ -195,16 +218,22 @@ FirmwareUpdater_OnDownloaded(MoatDownloader *in_dl, sse_bool in_canceled, sse_po
 {
   int err;
   int result = in_canceled ? SSE_E_INTR : SSE_E_OK;
+
+  TRACE_ENTER();
   err = TFirmwareUpdater_HandleDownloadResult((TFirmwareUpdater *)in_user_data, result);
-  MOAT_LOG_DEBUG(TAG, "err=%d", err);
+  LOG_DEBUG("err=%d", err);
+  TRACE_LEAVE();
 }
 
 static void
 FirmwareUpdater_OnDownloadError(MoatDownloader *in_dl, sse_int in_err_code, sse_pointer in_user_data)
 {
   int err;
+
+  TRACE_ENTER();
   err = TFirmwareUpdater_HandleDownloadResult((TFirmwareUpdater *)in_user_data, in_err_code);
-  MOAT_LOG_DEBUG(TAG, "err=%d", err);
+  LOG_DEBUG("err=%d", err);
+  TRACE_LEAVE();
 }
 
 static sse_int
@@ -219,26 +248,27 @@ FirmwareUpdater_OnDownloadAndUpdate(TDownloadInfoModel *in_info, sse_char *in_ke
   sse_char *file_path = NULL;
   sse_int err = SSE_E_INVAL;
 
+  TRACE_ENTER();
   key = sse_strdup(in_key);
   if (key == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to duplicate key.");
+    LOG_ERROR("failed to duplicate key.");
     err = SSE_E_NOMEM;
     goto error_exit;
   }
   info_obj = TDownloadInfoModel_GetModelObject(in_info);
   if (info_obj == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to TDownloadInfoModel_GetModelObject()");
+    LOG_ERROR("failed to TDownloadInfoModel_GetModelObject()");
     err = SSE_E_INVAL;
     goto error_exit;
   }
   err = moat_object_get_string_value(info_obj, "url", &url, &url_len);
   if (err) {
-    MOAT_LOG_ERROR(TAG, "failed to get url.");
+    LOG_ERROR("failed to get url.");
     goto error_exit;
   }
   file_path = FirmwarePackage_GetPackageFilePath();
   if (file_path == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to download path.");
+    LOG_ERROR("failed to download path.");
     goto error_exit;
   }
   downloader = moat_downloader_new();
@@ -254,6 +284,7 @@ FirmwareUpdater_OnDownloadAndUpdate(TDownloadInfoModel *in_info, sse_char *in_ke
   }
   updater->fAsyncKey = key;
   updater->fDownloader = downloader;
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
@@ -272,12 +303,14 @@ error_exit:
 static sse_int
 TFirmwareUpdater_HandleCheckResult(TFirmwareUpdater *self, sse_int in_err, sse_char *in_err_info)
 {
+  TRACE_ENTER();
   if (self->fAsyncKey == NULL) {
-    MOAT_LOG_ERROR(TAG, "AsyncKey is missing.");
+    LOG_ERROR("AsyncKey is missing.");
     return SSE_E_INVAL;
   }
   TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, in_err, in_err_info);
   TFirmwareUpdater_Clear(self);
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
@@ -285,8 +318,12 @@ static sse_int
 FirmwareUpdater_OnCheckEnded(TFirmwarePackage *package, sse_int in_err, sse_char *in_err_info, sse_pointer in_user_data)
 {
   int err;
+
+  TRACE_ENTER();
   err = TFirmwareUpdater_HandleCheckResult((TFirmwareUpdater *)in_user_data, in_err, in_err_info);
-  MOAT_LOG_DEBUG(TAG, "in_err=%d, in_err_info=%s, err=%d", in_err, in_err_info, err);
+  LOG_DEBUG("in_err=%d, in_err_info=%s, err=%d", in_err, in_err_info, err);
+
+  TRACE_LEAVE();
   return err;
 }
 
@@ -303,44 +340,42 @@ TFirmwareUpdater_CheckResult(TFirmwareUpdater *self)
   sse_char *err_info = "";
   sse_bool ok;
 
+  TRACE_ENTER();
   err = moat_datastore_load_object(self->fMoat, FW_UPDATE_STORED_CONTEXT_KEY, &stored_ctx);
   if (err != SSE_E_OK) {
-    if (err == SSE_E_NOENT) {
-      return err;
-    }
-    MOAT_LOG_ERROR(TAG, "failed to moat_datastore_load_object(). err=%d", err);
-    return err;
+    LOG_INFO("failed to moat_datastore_load_object(). err=%d", err);
+    return SSE_E_OK;
   }
 
   err = moat_object_get_string_value(stored_ctx, FW_UPDATE_ASYNC_KEY, &p, &len);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "Async key could not found.");
+    LOG_ERROR("Async key could not found.");
     err = SSE_E_INVAL;
     goto error_exit;
   }
   async_key = sse_strndup(p, len);
   if (async_key == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to alloc async key.");
+    LOG_ERROR("failed to alloc async key.");
     err = SSE_E_NOMEM;
     goto error_exit;
   }
   err = TDownloadInfoModel_SetModelObject(&self->fInfo, stored_ctx);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to TDownloadInfoModel_SetModelObject().");
+    LOG_ERROR("failed to TDownloadInfoModel_SetModelObject().");
     err = SSE_E_GENERIC;
     err_info = "Failed to set model object.";
     goto error_exit;
   }
   package = FirmwarePackage_New();
   if (package == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to FirmwarePackage_New().");
+    LOG_ERROR("failed to FirmwarePackage_New().");
     err = SSE_E_NOMEM;
     err_info = "Out of memory.";
     goto error_exit;
   }
   ok = TFirmwarePackage_Verify(package);
   if (!ok) {
-    MOAT_LOG_ERROR(TAG, "failed to TFirmwarePackage_Verify().");
+    LOG_ERROR("failed to TFirmwarePackage_Verify().");
     err = SSE_E_INVAL;
     err_info = "Check failed: Invalid package.";
     goto error_exit;
@@ -353,6 +388,7 @@ TFirmwareUpdater_CheckResult(TFirmwareUpdater *self)
   moat_object_free(stored_ctx);
   self->fAsyncKey = async_key;
   self->fPackage = package;
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
@@ -377,6 +413,8 @@ sse_int
 TFirmwareUpdater_Start(TFirmwareUpdater *self)
 {
   sse_int err;
+
+  TRACE_ENTER();
   err = TDownloadInfoModel_Start(&self->fInfo);
   if (err != SSE_E_OK) {
     return err;
@@ -384,28 +422,35 @@ TFirmwareUpdater_Start(TFirmwareUpdater *self)
   TDownloadInfoModel_SetDownloadAndUpdateCommandCallback(&self->fInfo,
       FirmwareUpdater_OnDownloadAndUpdate, self);
   err = TFirmwareUpdater_CheckResult(self);
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
 void
 TFirmwareUpdater_Stop(TFirmwareUpdater *self)
 {
+  TRACE_ENTER();
   TDownloadInfoModel_SetDownloadAndUpdateCommandCallback(&self->fInfo, NULL, NULL);
   TDownloadInfoModel_Stop(&self->fInfo);
+  TRACE_LEAVE();
 }
 
 sse_int
 TFirmwareUpdater_Initialize(TFirmwareUpdater *self, Moat in_moat)
 {
+  TRACE_ENTER();
   sse_memset(self, 0, sizeof(TFirmwareUpdater));
   self->fMoat = in_moat;
   TDownloadInfoModel_Initialize(&self->fInfo, in_moat);
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
 void
 TFirmwareUpdater_Finalize(TFirmwareUpdater *self)
 {
+  TRACE_ENTER();
   TDownloadInfoModel_Finalize(&self->fInfo);
   TFirmwareUpdater_Clear(self);
+  TRACE_LEAVE();
 }

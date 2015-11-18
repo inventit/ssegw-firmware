@@ -20,20 +20,29 @@
 
 #define TAG "DownloadInfoModel"
 
+#define TRACE_ENTER() MOAT_LOG_TRACE(TAG, "== enter =>");
+#define TRACE_LEAVE() MOAT_LOG_TRACE(TAG, "<= leave ==");
+#define LOG_ERROR(format, ...)  MOAT_LOG_ERROR(TAG, format, ##__VA_ARGS__)
+#define LOG_INFO(format, ...) MOAT_LOG_INFO(TAG, format, ##__VA_ARGS__)
+#define LOG_DEBUG(format, ...)  MOAT_LOG_DEBUG(TAG, format, ##__VA_ARGS__)
+
 /* DownloadInfoModel private */
 static sse_int
 DownloadInfoModel_CopyObjectField(MoatObject *in_src, MoatObject *in_dst, sse_char *in_key)
 {
   MoatValue *value;
   sse_int err;
+
+  TRACE_ENTER();
   value = moat_object_get_value(in_src, in_key);
   if (value != NULL) {
     err = moat_object_add_value(in_dst, in_key, value, sse_true, sse_true);
     if (err != SSE_E_OK) {
-      MOAT_LOG_ERROR(TAG, "failed to moat_object_add_value(%s).", in_key);
+      LOG_ERROR("failed to moat_object_add_value(%s).", in_key);
       return err;
     }
   }
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
@@ -43,15 +52,17 @@ DownloadInfoModel_OnDownloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *
   TDownloadInfoModel *model= (TDownloadInfoModel *)in_model_context;
   sse_int err;
 
+  TRACE_ENTER();
   if (in_key == NULL) {
-    MOAT_LOG_ERROR(TAG, "async key is nil.");
+    LOG_ERROR("async key is nil.");
     return SSE_E_INVAL;
   }
   if (model->fCurrentInfo == NULL || model->fCommandCallback == NULL) {
-    MOAT_LOG_ERROR(TAG, "invalid model state");
+    LOG_ERROR("invalid model state");
     return SSE_E_INVAL;
   }
   err = (*model->fCommandCallback)(model, in_key, model->fCommandUserData);
+  TRACE_LEAVE();
 	return err;
 }
 
@@ -63,21 +74,26 @@ TDownloadInfoModel_UpdateCurrent(TDownloadInfoModel *self, sse_char *in_uid, Moa
   sse_uint len;
   sse_int err;
 
+  TRACE_ENTER();
   if (in_object == NULL) {
+    LOG_ERROR("in_object is nil.");
     return SSE_E_INVAL;
   }
   err = moat_object_get_string_value(in_object, DOWNLOAD_INFO_MODEL_FIELD_URL, &p, &len);
   if (err) {
+    LOG_ERROR("failed to moat_object_get_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
     return SSE_E_INVAL;
   }
 
   obj = moat_object_clone(in_object);
   if (obj == NULL) {
+    LOG_ERROR("failed to moat_object_clone().");
     err = SSE_E_NOMEM;
     goto error_exit;
   }
   TDownloadInfoModel_Clear(self);
   self->fCurrentInfo = obj;
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
@@ -94,7 +110,9 @@ DownloadInfoModel_OnUpdate(Moat in_moat, sse_char *in_uid, MoatObject *in_object
   TDownloadInfoModel *model = (TDownloadInfoModel *)in_model_context;
   sse_int err;
 
+  TRACE_ENTER();
   err = TDownloadInfoModel_UpdateCurrent(model, in_uid, in_object);
+  TRACE_LEAVE();
   return err;
 }
 
@@ -105,13 +123,17 @@ DownloadInfo_downloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *in_key,
   TDownloadInfoModel *model = (TDownloadInfoModel *)in_model_context;
   sse_int err;
 
+  TRACE_ENTER();
   if (model->fCommandCallback == NULL) {
+    LOG_ERROR("Command Callback is nil.");
     return SSE_E_INVAL;
   }
   err = moat_start_async_command(in_moat, in_uid, in_key, in_data, DownloadInfoModel_OnDownloadAndUpdate, in_model_context);
   if (err) {
+    LOG_ERROR("failed to moat_start_async_command().");
     return err;
   }
+  TRACE_LEAVE();
   return SSE_E_INPROGRESS;
 }
 
@@ -119,10 +141,12 @@ DownloadInfo_downloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *in_key,
 void
 TDownloadInfoModel_Clear(TDownloadInfoModel *self)
 {
+  TRACE_ENTER();
   if (self->fCurrentInfo != NULL) {
     moat_object_free(self->fCurrentInfo);
     self->fCurrentInfo = NULL;
   }
+  TRACE_LEAVE();
 }
 
 sse_int
@@ -135,10 +159,12 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
   sse_int err;
   sse_int req_id;
 
+  TRACE_ENTER();
   if (self->fCurrentInfo == NULL) {
-    MOAT_LOG_ERROR(TAG, "Current object is nil.");
+    LOG_ERROR("Current object is nil.");
     return SSE_E_INVAL;
   }
+  LOG_DEBUG("err_code=%d, info=%s", in_err_code, (in_err_info == NULL) ? "" : in_err_info);
   service_id = moat_create_notification_id_with_moat(self->fMoat, "update-result", "1.0");
   info = self->fCurrentInfo;
   if (in_err_code != SSE_E_OK) {
@@ -153,26 +179,31 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
   }
   err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_STATUS, status, 0, sse_true, sse_true);
   if (err) {
+    LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_STATUS);
     goto error_exit;
   }
   if (err_info != NULL) {
     err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO, err_info, 0, sse_true, sse_true);
     if (err) {
+      LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
       goto error_exit;
     }
   }
   /* for reduce value size : set url value "" */
   err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_URL, "", 0, sse_true, sse_true);
   if (err) {
+    LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
     goto error_exit;
   }
   req_id = moat_send_notification(self->fMoat, service_id, in_key, DOWNLOAD_INFO_MODEL_NAME, info, NULL, NULL);
   if (req_id < 0) {
     err = req_id;
+    LOG_ERROR("failed to moat_send_notification(%s).", DOWNLOAD_INFO_MODEL_NAME);
   } else {
     err = SSE_E_OK;
   }
   sse_free(service_id);
+  TRACE_LEAVE();
   return err;
 
 error_exit:
@@ -185,6 +216,8 @@ error_exit:
 MoatObject *
 TDownloadInfoModel_GetModelObject(TDownloadInfoModel *self)
 {
+  TRACE_ENTER();
+  TRACE_LEAVE();
   return self->fCurrentInfo;
 }
 
@@ -196,41 +229,47 @@ TDownloadInfoModel_SetModelObject(TDownloadInfoModel *self, MoatObject *in_obj)
   sse_uint len;
   sse_int err;
 
+  TRACE_ENTER();
   err = moat_object_get_string_value(in_obj, DOWNLOAD_INFO_MODEL_FIELD_URL, &p, &len);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "%s is missing.", DOWNLOAD_INFO_MODEL_FIELD_URL);
+    LOG_ERROR("%s is missing.", DOWNLOAD_INFO_MODEL_FIELD_URL);
     return err;
   }
   obj = moat_object_new();
   if (obj == NULL) {
-    MOAT_LOG_ERROR(TAG, "failed to moat_object_new().");
+    LOG_ERROR("failed to moat_object_new().");
     return SSE_E_NOMEM;
   }
   err = moat_object_add_string_value(obj, DOWNLOAD_INFO_MODEL_FIELD_URL, p, len, sse_true, sse_true);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
+    LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
     goto error_exit;
   }
   err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_NAME);
   if (err != SSE_E_OK) {
+    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_NAME);
     goto error_exit;
   }
   err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_VERSION);
   if (err != SSE_E_OK) {
+    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_VERSION);
     goto error_exit;
   }
   err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_STATUS);
   if (err != SSE_E_OK) {
+    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_STATUS);
     goto error_exit;
   }
   err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
   if (err != SSE_E_OK) {
+    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
     goto error_exit;
   }
   if (self->fCurrentInfo != NULL) {
     moat_object_free(self->fCurrentInfo);
   }
   self->fCurrentInfo = obj;
+  TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
@@ -243,8 +282,10 @@ error_exit:
 void
 TDownloadInfoModel_SetDownloadAndUpdateCommandCallback(TDownloadInfoModel *self, DownloadInfoModel_DownloadAndUpdateCommandCallback in_callback, sse_pointer in_user_data)
 {
+  TRACE_ENTER();
   self->fCommandCallback = in_callback;
   self->fCommandUserData = in_user_data;
+  TRACE_LEAVE();
 }
 
 sse_int
@@ -253,6 +294,7 @@ TDownloadInfoModel_Start(TDownloadInfoModel *self)
   ModelMapper mapper;
   sse_int err;
 
+  TRACE_ENTER();
   mapper.AddProc = NULL;
   mapper.RemoveProc = NULL;
   mapper.UpdateProc = DownloadInfoModel_OnUpdate;
@@ -260,33 +302,40 @@ TDownloadInfoModel_Start(TDownloadInfoModel *self)
   mapper.FindAllUidsProc = NULL;
   mapper.FindByUidProc = NULL;
   mapper.CountProc = NULL;
-  MOAT_LOG_DEBUG(TAG, "register_model %s", DOWNLOAD_INFO_MODEL_NAME);
+  LOG_DEBUG("register_model %s", DOWNLOAD_INFO_MODEL_NAME);
   err = moat_register_model(self->fMoat, DOWNLOAD_INFO_MODEL_NAME, &mapper, self);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to register model. err=%d", err);
+    LOG_ERROR("failed to register model. err=%d", err);
     return err;
   }
-  MOAT_LOG_DEBUG(TAG, "%s model has been registered.", DOWNLOAD_INFO_MODEL_NAME);
+  LOG_DEBUG("%s model has been registered.", DOWNLOAD_INFO_MODEL_NAME);
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
 void
 TDownloadInfoModel_Stop(TDownloadInfoModel *self)
 {
+  TRACE_ENTER();
   moat_unregister_model(self->fMoat, DOWNLOAD_INFO_MODEL_NAME);
   TDownloadInfoModel_Clear(self);
+  TRACE_LEAVE();
 }
 
 sse_int
 TDownloadInfoModel_Initialize(TDownloadInfoModel *self, Moat in_moat)
 {
+  TRACE_ENTER();
   sse_memset(self, 0, sizeof(TDownloadInfoModel));
   self->fMoat = in_moat;
+  TRACE_LEAVE();
   return SSE_E_OK;
 }
 
 void
 TDownloadInfoModel_Finalize(TDownloadInfoModel *self)
 {
+  TRACE_ENTER();
   TDownloadInfoModel_Clear(self);
+  TRACE_LEAVE();
 }
