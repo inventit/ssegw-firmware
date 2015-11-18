@@ -94,7 +94,7 @@ error_exit:
 static sse_int
 TFirmwareUpdate_UpdateFirmware(TFirmwareUpdater *self)
 {
-  sse_int err;
+  sse_int err = SSE_E_OK;
   sse_char *err_info = "";
   sse_bool ok;
 
@@ -102,6 +102,7 @@ TFirmwareUpdate_UpdateFirmware(TFirmwareUpdater *self)
   ok = TFirmwarePackage_Verify(self->fPackage);
   if (!ok) {
     LOG_ERROR("failed to TFirmwarePackage_Verify().");
+    err = SSE_E_INVAL;
     err_info = "Invalid package or state.";
     goto error_exit;
   }

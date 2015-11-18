@@ -92,6 +92,7 @@ FirmwarePackage_RemoveDir(sse_char *in_dir_path)
   sse_char *org_wd = NULL;
   sse_char *p;
   sse_char *path = NULL;
+  sse_int result;
 
   TRACE_ENTER();
   dir = opendir(in_dir_path);
@@ -107,7 +108,8 @@ FirmwarePackage_RemoveDir(sse_char *in_dir_path)
     sse_free(org_wd);
     return;
   }
-  chdir(in_dir_path);
+  result = chdir(in_dir_path);
+  LOG_DEBUG("chdir(%s):result=%d", in_dir_path, result);
   entry = readdir(dir);
   while (entry != NULL) {
     lstat(entry->d_name, &st);
@@ -119,7 +121,8 @@ FirmwarePackage_RemoveDir(sse_char *in_dir_path)
       path = FirmwarePackage_MakeFullPath(in_dir_path, entry->d_name);
       FirmwarePackage_RemoveDir(path);
       sse_free(path);
-      chdir(in_dir_path);
+      result = chdir(in_dir_path);
+      LOG_DEBUG("chdir(%s):result=%d", in_dir_path, result);
     } else {
       unlink(entry->d_name);
     }
@@ -127,7 +130,8 @@ FirmwarePackage_RemoveDir(sse_char *in_dir_path)
   }
   closedir(dir);
   remove(in_dir_path);
-  chdir(org_wd);
+  result = chdir(org_wd);
+  LOG_DEBUG("chdir(%s):result=%d", org_wd, result);
   sse_free(org_wd);
   TRACE_LEAVE();
 }
@@ -173,7 +177,7 @@ TFirmwarePackage_HandleCheckResultResult(TFirmwarePackage *self, sse_int in_err,
 static sse_int
 TFirmwarePackage_HandleCommandResult(TFirmwarePackage *self, sse_int in_err, sse_char *in_err_info)
 {
-  sse_int err;
+  sse_int err = SSE_E_OK;
 
   TRACE_ENTER();
   switch (self->fState) {
@@ -183,6 +187,9 @@ TFirmwarePackage_HandleCommandResult(TFirmwarePackage *self, sse_int in_err, sse
   case FWPKG_STATE_CHECKING:
     err = TFirmwarePackage_HandleCheckResultResult(self, in_err, in_err_info);
     break;
+  default:
+    err = SSE_E_INVAL;
+    break;
   }
   if (self->fCurrentCommand != NULL) {
     TSseUtilShellCommand_Delete(self->fCurrentCommand);
@@ -190,6 +197,7 @@ TFirmwarePackage_HandleCommandResult(TFirmwarePackage *self, sse_int in_err, sse
     self->fCommandCallback = NULL;
     self->fCommandUserData = NULL;
   }
+  LOG_DEBUG("err=%d", err);
   TRACE_LEAVE();
   return err;
 }
@@ -230,6 +238,7 @@ sse_int
 TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self)
 {
   sse_char *path = NULL;
+  int result;
 
   TRACE_ENTER();
   path = FirmwarePackage_MakeFullPath(self->fPackageDirPath, FWPKG_UPGRADE_SCRIPT_PATH);
@@ -238,7 +247,8 @@ TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self)
     return SSE_E_NOMEM;
   }
   self->fState = FWPKG_STATE_UPDATING;
-  system(path);
+  result = system(path);
+  LOG_DEBUG("command:[%s]. result=%d", path, result);
   TRACE_LEAVE();
   return SSE_E_OK;
 }
