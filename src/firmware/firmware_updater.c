@@ -49,6 +49,7 @@ TFirmwareUpdater_Clear(TFirmwareUpdater *self)
     self->fAsyncKey = NULL;
   }
   if (self->fPackage != NULL) {
+    TFirmwarePackage_RemovePackage(self->fPackage);
     TFirmwarePackage_Delete(self->fPackage);
     self->fPackage = NULL;
   }

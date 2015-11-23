@@ -249,6 +249,9 @@ TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self)
   self->fState = FWPKG_STATE_UPDATING;
   result = system(path);
   LOG_DEBUG("command:[%s]. result=%d", path, result);
+  if (result != 0) {
+    return SSE_E_GENERIC;
+  }
   TRACE_LEAVE();
   return SSE_E_OK;
 }
@@ -451,6 +454,18 @@ error_exit:
   return err;
 }
 
+void TFirmwarePackage_RemovePackage(TFirmwarePackage *self)
+{
+  TRACE_ENTER();
+  if (self->fPackageDirPath != NULL) {
+    FirmwarePackage_RemoveDir(self->fPackageDirPath);
+  }
+  if (self->fPackageFilePath != NULL) {
+    unlink(self->fPackageFilePath);
+  }
+  TRACE_LEAVE();
+}
+
 TFirmwarePackage *
 FirmwarePackage_New(void)
 {
@@ -486,11 +501,9 @@ TFirmwarePackage_Delete(TFirmwarePackage *self)
 {
   TRACE_ENTER();
   if (self->fPackageDirPath != NULL) {
-//    FirmwarePackage_RemoveDir(package->fPackageDirPath);
     sse_free(self->fPackageDirPath);
   }
   if (self->fPackageFilePath != NULL) {
-//    SseUtilFile_DeleteFile(package->fPackageFilePath);
     sse_free(self->fPackageFilePath);
   }
   sse_free(self);

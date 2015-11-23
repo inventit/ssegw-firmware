@@ -40,6 +40,7 @@ sse_int TFirmwarePackage_Extract(TFirmwarePackage *self, FirmwarePackage_Command
 sse_bool TFirmwarePackage_Verify(TFirmwarePackage *self);
 sse_int TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self);
 sse_int TFirmwarePackage_CheckResult(TFirmwarePackage *self, FirmwarePackage_CommandCallback in_callback, sse_pointer in_user_data);
+void TFirmwarePackage_RemovePackage(TFirmwarePackage *self);
 
 sse_char * FirmwarePackage_GetPackageFilePath(void);
 sse_char * FirmwarePackage_GetPackageDirPath(void);
