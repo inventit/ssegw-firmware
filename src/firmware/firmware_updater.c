@@ -344,7 +344,6 @@ TFirmwareUpdater_CheckResult(TFirmwareUpdater *self)
   TRACE_ENTER();
   err = moat_datastore_load_object(self->fMoat, FW_UPDATE_STORED_CONTEXT_KEY, &stored_ctx);
   if (err != SSE_E_OK) {
-    LOG_INFO("failed to moat_datastore_load_object(). err=%d", err);
     return SSE_E_OK;
   }
 
@@ -360,6 +359,7 @@ TFirmwareUpdater_CheckResult(TFirmwareUpdater *self)
     err = SSE_E_NOMEM;
     goto error_exit;
   }
+  moat_object_remove_value(stored_ctx, FW_UPDATE_ASYNC_KEY);
   err = TDownloadInfoModel_SetModelObject(&self->fInfo, stored_ctx);
   if (err != SSE_E_OK) {
     LOG_ERROR("failed to TDownloadInfoModel_SetModelObject().");

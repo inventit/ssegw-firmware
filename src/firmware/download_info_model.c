@@ -27,24 +27,6 @@
 #define LOG_DEBUG(format, ...)  MOAT_LOG_DEBUG(TAG, format, ##__VA_ARGS__)
 
 /* DownloadInfoModel private */
-static sse_int
-DownloadInfoModel_CopyObjectField(MoatObject *in_src, MoatObject *in_dst, sse_char *in_key)
-{
-  MoatValue *value;
-  sse_int err;
-
-  TRACE_ENTER();
-  value = moat_object_get_value(in_src, in_key);
-  if (value != NULL) {
-    err = moat_object_add_value(in_dst, in_key, value, sse_true, sse_true);
-    if (err != SSE_E_OK) {
-      LOG_ERROR("failed to moat_object_add_value(%s).", in_key);
-      return err;
-    }
-  }
-  TRACE_LEAVE();
-  return SSE_E_OK;
-}
 
 static sse_int
 DownloadInfoModel_OnDownloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *in_key, MoatValue *in_data, sse_pointer in_model_context)
@@ -235,35 +217,10 @@ TDownloadInfoModel_SetModelObject(TDownloadInfoModel *self, MoatObject *in_obj)
     LOG_ERROR("%s is missing.", DOWNLOAD_INFO_MODEL_FIELD_URL);
     return err;
   }
-  obj = moat_object_new();
+  obj = moat_object_clone(in_obj);
   if (obj == NULL) {
     LOG_ERROR("failed to moat_object_new().");
     return SSE_E_NOMEM;
-  }
-  err = moat_object_add_string_value(obj, DOWNLOAD_INFO_MODEL_FIELD_URL, p, len, sse_true, sse_true);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
-    goto error_exit;
-  }
-  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_NAME);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_NAME);
-    goto error_exit;
-  }
-  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_VERSION);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_VERSION);
-    goto error_exit;
-  }
-  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_STATUS);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_STATUS);
-    goto error_exit;
-  }
-  err = DownloadInfoModel_CopyObjectField(in_obj, obj, DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to DownloadInfoModel_CopyObjectField(%s).", DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
-    goto error_exit;
   }
   if (self->fCurrentInfo != NULL) {
     moat_object_free(self->fCurrentInfo);
@@ -271,12 +228,6 @@ TDownloadInfoModel_SetModelObject(TDownloadInfoModel *self, MoatObject *in_obj)
   self->fCurrentInfo = obj;
   TRACE_LEAVE();
   return SSE_E_OK;
-
-error_exit:
-  if (obj != NULL) {
-    moat_object_free(obj);
-  }
-  return err;
 }
 
 void
