@@ -1,39 +1,42 @@
 {
-	"name": "firmware",
-	"version": "0.0.1",
-	"description": "Suncorp Rooster GX Firmware Management",
-	"maintainers": [
-		{
-			"name": "Tokyo Engineering Team",
-			"email": "asparagus@yourinventit.com"
-		}
-	],
-	"bugs": {
-		"mail": "iidn-sys-notice@yourinventit.com"
-	},
-	"main" : "firmware.so",
-	"models" : {
-		"Binary" : {
-			"array" : true,
-			"shared" : true,
-			"attributes" : {
-				"name" : {"type" : "string"},
-				"version" : {"type" : "string"},
-				"object" : {"type" : "resource"}
-			}
-		},
-		"DownloadInfo" : {
-			"array" : false,
-			"attributes" : {
-				"url" : {"type" : "string"},
-				"name" : {"type" : "string"},
-				"version" : {"type" : "string"},
-				"status" : {"type" : "string"},
-				"errorInfo" : {"type" : "string"}
-			},
-			"commands" : {
-				"downloadAndUpdate" : {"paramType" : null}
-			}
-		}
-	}
+  "name": "firmware",
+  "version": "0.9.0",
+  "description": "Firmware Management",
+  "maintainers": [
+    {
+      "name": "Inventit Inc.",
+      "email": "egypt@yourinventit.com"
+    }
+  ],
+  "bugs": {
+    "mail": "egypt@yourinventit.com"
+  },
+  "dependencies": {
+    "moat": ">=1.0.0 <2.0.0"
+  },
+  "main" : "firmware.so",
+  "models" : {
+    "Binary" : {
+      "array" : true,
+      "shared" : true,
+      "attributes" : {
+        "name" : {"type" : "string"},
+        "version" : {"type" : "string"},
+        "object" : {"type" : "resource"}
+      }
+    },
+    "DownloadInfo" : {
+      "array" : false,
+      "attributes" : {
+        "url" : {"type" : "string"},
+        "name" : {"type" : "string"},
+        "version" : {"type" : "string"},
+        "status" : {"type" : "string"},
+        "errorInfo" : {"type" : "string"}
+      },
+      "commands" : {
+        "downloadAndUpdate" : {"paramType" : null}
+      }
+    }
+  }
 }
