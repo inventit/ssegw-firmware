@@ -16,3 +16,5 @@ package/*.bin
 *.zip
 .editorconfig
 test/x86_64/*
+firmware/Armadillo-IoT/images/*
+
