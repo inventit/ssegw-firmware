@@ -19,6 +19,11 @@
 #include "firmware/firmware_updater.h"
 
 #define TAG	"firmware"
+#define TRACE_ENTER() MOAT_LOG_TRACE(TAG, "== enter =>");
+#define TRACE_LEAVE() MOAT_LOG_TRACE(TAG, "<= leave ==");
+#define LOG_ERROR(format, ...)  MOAT_LOG_ERROR(TAG, format, ##__VA_ARGS__)
+#define LOG_INFO(format, ...) MOAT_LOG_INFO(TAG, format, ##__VA_ARGS__)
+#define LOG_DEBUG(format, ...)  MOAT_LOG_DEBUG(TAG, format, ##__VA_ARGS__)
 
 sse_int
 moat_app_main(sse_int argc, sse_char *argv[])
@@ -29,17 +34,17 @@ moat_app_main(sse_int argc, sse_char *argv[])
 
   err = moat_init(argv[0], &moat);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to moat_init().");
+    LOG_ERROR("failed to moat_init().");
     goto error_exit;
   }
   err = TFirmwareUpdater_Initialize(&updater, moat);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to TFirmwareUpdater_Initialize().");
+    LOG_ERROR("failed to TFirmwareUpdater_Initialize().");
     goto error_exit;
   }
   err = TFirmwareUpdater_Start(&updater);
   if (err != SSE_E_OK) {
-    MOAT_LOG_ERROR(TAG, "failed to TFirmwareUpdater_Start().");
+    LOG_ERROR("failed to TFirmwareUpdater_Start().");
     TFirmwareUpdater_Finalize(&updater);
     goto error_exit;
   }
