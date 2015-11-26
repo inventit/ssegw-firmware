@@ -44,8 +44,12 @@ DownloadInfoModel_OnDownloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *
     return SSE_E_INVAL;
   }
   err = (*model->fCommandCallback)(model, in_key, model->fCommandUserData);
+  if (err != SSE_E_OK) {
+    LOG_ERROR("failed to CommandCallback:%s", sse_get_error_string(err));
+    return err;
+  }
   TRACE_LEAVE();
-	return err;
+	return SSE_E_OK;
 }
 
 static sse_int
@@ -62,7 +66,7 @@ TDownloadInfoModel_UpdateCurrent(TDownloadInfoModel *self, sse_char *in_uid, Moa
     return SSE_E_INVAL;
   }
   err = moat_object_get_string_value(in_object, DOWNLOAD_INFO_MODEL_FIELD_URL, &p, &len);
-  if (err) {
+  if (err != SSE_E_OK) {
     LOG_ERROR("failed to moat_object_get_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
     return SSE_E_INVAL;
   }
@@ -112,7 +116,7 @@ DownloadInfo_downloadAndUpdate(Moat in_moat, sse_char *in_uid, sse_char *in_key,
   }
   err = moat_start_async_command(in_moat, in_uid, in_key, in_data, DownloadInfoModel_OnDownloadAndUpdate, in_model_context);
   if (err) {
-    LOG_ERROR("failed to moat_start_async_command().");
+    LOG_ERROR("failed to moat_start_async_command(). err=%s", sse_get_error_string(err));
     return err;
   }
   TRACE_LEAVE();
@@ -142,11 +146,11 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
   sse_int req_id;
 
   TRACE_ENTER();
+  LOG_DEBUG("err=%s, info=%s", sse_get_error_string(in_err_code), (in_err_info == NULL) ? "" : in_err_info);
   if (self->fCurrentInfo == NULL) {
     LOG_ERROR("Current object is nil.");
     return SSE_E_INVAL;
   }
-  LOG_DEBUG("err_code=%d, info=%s", in_err_code, (in_err_info == NULL) ? "" : in_err_info);
   service_id = moat_create_notification_id_with_moat(self->fMoat, "update-result", "1.0");
   info = self->fCurrentInfo;
   if (in_err_code != SSE_E_OK) {
@@ -160,33 +164,32 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
     status = "UPDATED";
   }
   err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_STATUS, status, 0, sse_true, sse_true);
-  if (err) {
+  if (err != SSE_E_OK) {
     LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_STATUS);
     goto error_exit;
   }
   if (err_info != NULL) {
     err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO, err_info, 0, sse_true, sse_true);
-    if (err) {
+    if (err != SSE_E_OK) {
       LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_ERROR_INFO);
       goto error_exit;
     }
   }
   /* for reduce value size : set url value "" */
   err = moat_object_add_string_value(info, DOWNLOAD_INFO_MODEL_FIELD_URL, "", 0, sse_true, sse_true);
-  if (err) {
+  if (err != SSE_E_OK) {
     LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
     goto error_exit;
   }
   req_id = moat_send_notification(self->fMoat, service_id, in_key, DOWNLOAD_INFO_MODEL_NAME, info, NULL, NULL);
   if (req_id < 0) {
     err = req_id;
-    LOG_ERROR("failed to moat_send_notification(%s).", DOWNLOAD_INFO_MODEL_NAME);
-  } else {
-    err = SSE_E_OK;
+    LOG_ERROR("failed to moat_send_notification(%s). err=%s", DOWNLOAD_INFO_MODEL_NAME, sse_get_error_string(err));
+    goto error_exit;
   }
   sse_free(service_id);
   TRACE_LEAVE();
-  return err;
+  return SSE_E_OK;
 
 error_exit:
   if (service_id != NULL) {
