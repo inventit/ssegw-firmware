@@ -180,6 +180,10 @@ TFirmwarePackage_HandleCommandResult(TFirmwarePackage *self, sse_int in_err, sse
   sse_int err = SSE_E_OK;
 
   TRACE_ENTER();
+  if (self->fCurrentCommand != NULL) {
+    TSseUtilShellCommand_Delete(self->fCurrentCommand);
+    self->fCurrentCommand = NULL;
+  }
   switch (self->fState) {
   case FWPKG_STATE_EXTRACTING:
     err = TFirmwarePackage_HandleExtractResult(self, in_err, in_err_info);
@@ -190,12 +194,6 @@ TFirmwarePackage_HandleCommandResult(TFirmwarePackage *self, sse_int in_err, sse
   default:
     err = SSE_E_INVAL;
     break;
-  }
-  if (self->fCurrentCommand != NULL) {
-    TSseUtilShellCommand_Delete(self->fCurrentCommand);
-    self->fCurrentCommand = NULL;
-    self->fCommandCallback = NULL;
-    self->fCommandUserData = NULL;
   }
   LOG_DEBUG("err=%d", err);
   TRACE_LEAVE();
@@ -249,6 +247,7 @@ TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self)
   self->fState = FWPKG_STATE_UPDATING;
   result = system(path);
   LOG_DEBUG("command:[%s]. result=%d", path, result);
+  sse_free(path);
   if (result != 0) {
     return SSE_E_GENERIC;
   }

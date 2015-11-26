@@ -49,7 +49,6 @@ TFirmwareUpdater_Clear(TFirmwareUpdater *self)
     self->fAsyncKey = NULL;
   }
   if (self->fPackage != NULL) {
-    TFirmwarePackage_RemovePackage(self->fPackage);
     TFirmwarePackage_Delete(self->fPackage);
     self->fPackage = NULL;
   }
@@ -93,7 +92,7 @@ error_exit:
 }
 
 static sse_int
-TFirmwareUpdate_UpdateFirmware(TFirmwareUpdater *self)
+TFirmwareUpdater_UpdateFirmware(TFirmwareUpdater *self)
 {
   sse_int err = SSE_E_OK;
   sse_char *err_info = "";
@@ -115,6 +114,7 @@ TFirmwareUpdate_UpdateFirmware(TFirmwareUpdater *self)
   err = TFirmwarePackage_InvokeUpdate(self->fPackage);
   if (err != SSE_E_OK) {
     err_info = "Failed to update.";
+    moat_datastore_remove_object(self->fMoat, FW_UPDATE_STORED_CONTEXT_KEY);
     goto error_exit;
   }
   TRACE_LEAVE();
@@ -140,7 +140,7 @@ TFirmwareUpdater_HandleExtractResult(TFirmwareUpdater *self, sse_int in_err, sse
     TDownloadInfoModel_NotifyResult(&self->fInfo, self->fAsyncKey, err, in_err_info);
     TFirmwareUpdater_Clear(self);
   } else {
-    TFirmwareUpdate_UpdateFirmware(self);
+    TFirmwareUpdater_UpdateFirmware(self);
   }
   TRACE_LEAVE();
   return SSE_E_OK;
@@ -284,6 +284,7 @@ FirmwareUpdater_OnDownloadAndUpdate(TDownloadInfoModel *in_info, sse_char *in_ke
   if (err) {
     goto error_exit;
   }
+  sse_free(file_path);
   updater->fAsyncKey = key;
   updater->fDownloader = downloader;
   TRACE_LEAVE();
