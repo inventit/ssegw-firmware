@@ -1,5 +1,7 @@
 # !/bin/sh
 
+cd $(dirname $0)
+
 [ -f firmware.conf ] || (echo "firmware.conf was not found."; exit 1)
 . firmware.conf
 
