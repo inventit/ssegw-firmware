@@ -89,6 +89,14 @@ error_exit:
   return err;
 }
 
+static void
+DownloadInfoModel_OnNotificationResult(Moat in_moat, sse_char *in_urn, sse_char *in_model_name, sse_int in_request_id, sse_int in_result, sse_pointer in_user_data)
+{
+  TRACE_ENTER();
+  LOG_INFO("[result] urn=[%s], model=[%s]. request_id=%d, result=[%s]", in_urn, in_model_name, in_request_id, sse_get_error_string(in_result));
+  TRACE_LEAVE();
+}
+
 /* MOAT Mapper impl */
 static sse_int
 DownloadInfoModel_OnUpdate(Moat in_moat, sse_char *in_uid, MoatObject *in_object, sse_pointer in_model_context)
@@ -181,7 +189,9 @@ TDownloadInfoModel_NotifyResult(TDownloadInfoModel *self, sse_char *in_key, sse_
     LOG_ERROR("failed to moat_object_add_string_value(%s).", DOWNLOAD_INFO_MODEL_FIELD_URL);
     goto error_exit;
   }
-  req_id = moat_send_notification(self->fMoat, service_id, in_key, DOWNLOAD_INFO_MODEL_NAME, info, NULL, NULL);
+  LOG_INFO("[send] urn=[%s], model=[%s], err=[%s], err_info=[%s]", service_id,
+    DOWNLOAD_INFO_MODEL_NAME, sse_get_error_string(in_err_code), (err_info == NULL) ? "" : err_info);
+  req_id = moat_send_notification(self->fMoat, service_id, in_key, DOWNLOAD_INFO_MODEL_NAME, info, DownloadInfoModel_OnNotificationResult, self);
   if (req_id < 0) {
     err = req_id;
     LOG_ERROR("failed to moat_send_notification(%s). err=%s", DOWNLOAD_INFO_MODEL_NAME, sse_get_error_string(err));
