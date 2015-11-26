@@ -40,19 +40,6 @@
 #define FWPKG_UPGRADE_SCRIPT_PATH "fw/fw_upgrade.sh"
 #define FWPKG_CHECK_SCRIPT_PATH "fw/check_result.sh"
 
-#define USE_SYSTEM_TO_EXTRACT
-
-enum {
-  FWPKG_STATE_DORMANT = 0,
-  FWPKG_STATE_EXTRACTING,
-  FWPKG_STATE_EXTRACTED,
-  FWPKG_STATE_VERIFIED,
-  FWPKG_STATE_EXTRACT_FAILED,
-  FWPKG_STATE_UPDATING,
-  FWPKG_STATE_CHECKING,
-  FWPKG_STATES
-};
-
 static sse_char *
 FirmwarePackage_MakeFullPath(sse_char *in_base_path, sse_char *in_path)
 {
@@ -137,29 +124,6 @@ FirmwarePackage_RemoveDir(sse_char *in_dir_path)
 }
 
 static sse_int
-TFirmwarePackage_HandleExtractResult(TFirmwarePackage *self, sse_int in_err, sse_char *in_err_info)
-{
-  sse_int err;
-
-  TRACE_ENTER();
-  if (self->fCommandCallback == NULL) {
-    LOG_ERROR("CommandCallback is nil.");
-    return SSE_E_INVAL;
-  }
-  if (in_err == SSE_E_OK) {
-    LOG_DEBUG("Extracted");
-    self->fState = FWPKG_STATE_EXTRACTED;
-  } else {
-    LOG_ERROR("Extract Failed:%s", sse_get_error_string(in_err));
-    self->fState = FWPKG_STATE_EXTRACT_FAILED;
-  }
-  err = (*self->fCommandCallback)(self, in_err, in_err_info, self->fCommandUserData);
-  LOG_DEBUG("Callback result=%s", sse_get_error_string(err));
-  TRACE_LEAVE();
-  return err;
-}
-
-static sse_int
 TFirmwarePackage_HandleCheckResultResult(TFirmwarePackage *self, sse_int in_err, sse_char *in_err_info)
 {
   sse_int err;
@@ -169,41 +133,14 @@ TFirmwarePackage_HandleCheckResultResult(TFirmwarePackage *self, sse_int in_err,
     LOG_ERROR("CommandCallback is nil.");
     return SSE_E_INVAL;
   }
-  self->fState = FWPKG_STATE_DORMANT;
   err = (*self->fCommandCallback)(self, in_err, in_err_info, self->fCommandUserData);
   LOG_DEBUG("Callback result=%s", sse_get_error_string(err));
   TRACE_LEAVE();
   return err;
 }
 
-static sse_int
-TFirmwarePackage_HandleCommandResult(TFirmwarePackage *self, sse_int in_err, sse_char *in_err_info)
-{
-  sse_int err = SSE_E_OK;
-
-  TRACE_ENTER();
-  if (self->fCurrentCommand != NULL) {
-    TSseUtilShellCommand_Delete(self->fCurrentCommand);
-    self->fCurrentCommand = NULL;
-  }
-  switch (self->fState) {
-  case FWPKG_STATE_EXTRACTING:
-    err = TFirmwarePackage_HandleExtractResult(self, in_err, in_err_info);
-    break;
-  case FWPKG_STATE_CHECKING:
-    err = TFirmwarePackage_HandleCheckResultResult(self, in_err, in_err_info);
-    break;
-  default:
-    err = SSE_E_INVAL;
-    break;
-  }
-  LOG_DEBUG("err=%s", sse_get_error_string(err));
-  TRACE_LEAVE();
-  return err;
-}
-
 static void
-FirmwarePackage_OnCommandCompleted(TSseUtilShellCommand* self, sse_pointer in_user_data, sse_int in_result)
+FirmwarePackage_OnCheckCommandCompleted(TSseUtilShellCommand* self, sse_pointer in_user_data, sse_int in_result)
 {
   TFirmwarePackage *package = (TFirmwarePackage *)in_user_data;
   sse_int err;
@@ -214,23 +151,77 @@ FirmwarePackage_OnCommandCompleted(TSseUtilShellCommand* self, sse_pointer in_us
       err = SSE_E_OK;
   } else {
     err = SSE_E_GENERIC;
-    if (package->fState == FWPKG_STATE_EXTRACTING) {
-      err_info = "Failed to extract command.";
-    } else if (package->fState == FWPKG_STATE_CHECKING) {
-      err_info = "Failed to check result command.";
-    }
+    err_info = "Failed to check result command.";
   }
   LOG_DEBUG("Command Completed: result=%d", in_result);
-  TFirmwarePackage_HandleCommandResult(package, err, err_info);
+  err = TFirmwarePackage_HandleCheckResultResult(package, err, err_info);
+  LOG_DEBUG("err=%s", sse_get_error_string(err));
   TRACE_LEAVE();
 }
 
 static void
-FirmwarePackage_OnCommandError(TSseUtilShellCommand* self, sse_pointer in_user_data, sse_int in_error_code, const sse_char* in_message)
+FirmwarePackage_OnCheckCommandError(TSseUtilShellCommand* self, sse_pointer in_user_data, sse_int in_error_code, const sse_char* in_message)
 {
+  sse_int err;
   TRACE_ENTER();
   LOG_ERROR("Command Error: err=%s", sse_get_error_string(in_error_code));
-  TFirmwarePackage_HandleCommandResult((TFirmwarePackage *)in_user_data, in_error_code, (sse_char *)in_message);
+  err = TFirmwarePackage_HandleCheckResultResult((TFirmwarePackage *)in_user_data, in_error_code, (sse_char *)in_message);
+  LOG_DEBUG("err=%s", sse_get_error_string(err));
+  TRACE_LEAVE();
+}
+
+static sse_int
+TFirmwarePackage_DoExtract(TFirmwarePackage *self)
+{
+  MoatValue *dir_path = NULL;
+  const char * command = "unzip " FWPKG_FILE_NAME " -d ./" FWPKG_DIR_NAME "/";
+  int result;
+  sse_int err;
+  sse_char *err_info = NULL;
+
+  TRACE_ENTER();
+  dir_path = moat_value_new_string(self->fPackageDirPath, 0, sse_true);
+  if (dir_path == NULL) {
+    LOG_ERROR("failed to create moat_value for dir_path.");
+    err = SSE_E_NOMEM;
+    err_info = "Out of memory.";
+    goto error_exit;
+  }
+  FirmwarePackage_RemoveDir(self->fPackageDirPath);
+  err = SseUtilFile_MakeDirectory(dir_path);
+  if (err != SSE_E_OK) {
+    LOG_ERROR("failed to SseUtilFile_MakeDirectory(). path=[%s], err=%d", self->fPackageDirPath, err);
+    err_info = "Failed to create working directory.";
+    goto error_exit;
+  }
+
+  result = system(command);
+  if (result != 0) {
+    LOG_ERROR("failed to command:[%s]. result=%d", command, result);
+    err = SSE_E_GENERIC;
+    err_info = "Failed to extract command.";
+    goto error_exit;
+  }
+  err = SSE_E_OK;
+
+error_exit:
+  if (dir_path != NULL) {
+    moat_value_free(dir_path);
+  }
+  err = (*self->fCommandCallback)(self, err, err_info, self->fCommandUserData);
+  LOG_DEBUG("Callback result=%s", sse_get_error_string(err));
+  self->fCommandCallback = NULL;
+  self->fCommandUserData = NULL;
+  TRACE_LEAVE();
+  return err;
+}
+
+static void
+FirmwarePackage_OnStartExtract(MoatIdle *in_idle, sse_pointer in_user_data)
+{
+
+  TRACE_ENTER();
+  TFirmwarePackage_DoExtract((TFirmwarePackage *)in_user_data);
   TRACE_LEAVE();
 }
 
@@ -247,7 +238,6 @@ TFirmwarePackage_InvokeUpdate(TFirmwarePackage *self)
     LOG_ERROR("failed to FirmwarePackage_MakeFullPath(%s).", FWPKG_UPGRADE_SCRIPT_PATH);
     return SSE_E_NOMEM;
   }
-  self->fState = FWPKG_STATE_UPDATING;
   result = system(path);
   if (result != 0) {
     LOG_ERROR("command failed:[%s]. result=%d", path, result);
@@ -321,92 +311,29 @@ error_exit:
 sse_int
 TFirmwarePackage_Extract(TFirmwarePackage *self, FirmwarePackage_CommandCallback in_callback, sse_pointer in_user_data)
 {
-  MoatValue *dir_path = NULL;
-#ifndef USE_SYSTEM_TO_EXTRACT
-  TSseUtilShellCommand *command = NULL;
-#else /* USE_SYSTEM_TO_EXTRACT */
-  const char * command = "unzip " FWPKG_FILE_NAME " -d ./" FWPKG_DIR_NAME "/";
-  int result;
-#endif /* USE_SYSTEM_TO_EXTRACT */
+  MoatIdle *idle = NULL;
   sse_int err;
 
   TRACE_ENTER();
-  if (self->fCurrentCommand != NULL) {
-    LOG_ERROR("current command is not nil.");
-    return SSE_E_INVAL;
-  }
-  dir_path = moat_value_new_string(self->fPackageDirPath, 0, sse_true);
-  if (dir_path == NULL) {
-    LOG_ERROR("failed to create moat_value for dir_path.");
-    err = SSE_E_NOMEM;
+  idle = moat_idle_new(FirmwarePackage_OnStartExtract, self);
+  if (idle == NULL) {
+    LOG_ERROR("failed to moat_idle_new().");
     goto error_exit;
   }
-  FirmwarePackage_RemoveDir(self->fPackageDirPath);
-  err = SseUtilFile_MakeDirectory(dir_path);
+  err = moat_idle_start(idle);
   if (err != SSE_E_OK) {
-    LOG_ERROR("failed to SseUtilFile_MakeDirectory(). path=[%s], err=%d", self->fPackageDirPath, err);
+    LOG_ERROR("failed to moat_idle_start(). err=%s", sse_get_error_string(err));
     goto error_exit;
   }
-
-#ifndef USE_SYSTEM_TO_EXTRACT
-  command = SseUtilShellCommand_New();
-  if (command == NULL) {
-    LOG_ERROR("failed to SseUtilShellCommand_New().");
-    return SSE_E_NOMEM;
-  }
-  TSseUtilShellCommand_SetOnComplatedCallback(command, FirmwarePackage_OnCommandCompleted, self);
-  TSseUtilShellCommand_SetOnErrorCallback(command, FirmwarePackage_OnCommandError, self);
-  err = TSseUtilShellCommand_SetShellCommand(command, "unzip");
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to TSseUtilShellCommand_SetShellCommand(). err=%d", err);
-    goto error_exit;
-  }
-  err = TSseUtilShellCommand_AddArgument(command, FWPKG_FILE_NAME);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to TSseUtilShellCommand_AddArgument(). err=%d", err);
-    goto error_exit;
-  }
-  err = TSseUtilShellCommand_AddArgument(command, "-d");
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to TSseUtilShellCommand_AddArgument(). err=%d", err);
-    goto error_exit;
-  }
-  err = TSseUtilShellCommand_AddArgument(command, "./" FWPKG_DIR_NAME "/");
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to TSseUtilShellCommand_AddArgument(). err=%d", err);
-    goto error_exit;
-  }
-  err = TSseUtilShellCommand_Execute(command);
-  if (err != SSE_E_OK) {
-    LOG_ERROR("failed to TSseUtilShellCommand_Execute(). err=%d", err);
-    goto error_exit;
-  }
-  self->fCurrentCommand = command;
   self->fCommandCallback = in_callback;
   self->fCommandUserData = in_user_data;
-  self->fState = FWPKG_STATE_EXTRACTING;
-#else /* USE_SYSTEM_TO_EXTRACT */
-  result = system(command);
-
-  LOG_DEBUG("command:[%s]. result=%d", command, result);
-  self->fCommandCallback = in_callback;
-  self->fCommandUserData = in_user_data;
-  self->fState = FWPKG_STATE_EXTRACTING;
-  FirmwarePackage_OnCommandCompleted(NULL, self, result);
-#endif /* USE_SYSTEM_TO_EXTRACT */
-  moat_value_free(dir_path);
   TRACE_LEAVE();
   return SSE_E_OK;
 
 error_exit:
-  if (dir_path != NULL) {
-    moat_value_free(dir_path);
+  if (idle != NULL) {
+    moat_idle_free(idle);
   }
-#ifndef USE_SYSTEM_TO_EXTRACT
-  if (command != NULL) {
-    TSseUtilShellCommand_Delete(command);
-  }
-#endif /* USE_SYSTEM_TO_EXTRACT */
   return err;
 }
 
@@ -432,8 +359,8 @@ TFirmwarePackage_CheckResult(TFirmwarePackage *self, FirmwarePackage_CommandCall
     LOG_ERROR("failed to SseUtilShellCommand_New().");
     return SSE_E_NOMEM;
   }
-  TSseUtilShellCommand_SetOnComplatedCallback(command, FirmwarePackage_OnCommandCompleted, self);
-  TSseUtilShellCommand_SetOnErrorCallback(command, FirmwarePackage_OnCommandError, self);
+  TSseUtilShellCommand_SetOnComplatedCallback(command, FirmwarePackage_OnCheckCommandCompleted, self);
+  TSseUtilShellCommand_SetOnErrorCallback(command, FirmwarePackage_OnCheckCommandError, self);
   err = TSseUtilShellCommand_SetShellCommand(command, cmd_path);
   if (err != SSE_E_OK) {
     LOG_ERROR("failed to TSseUtilShellCommand_SetShellCommand(). err=%d", err);
@@ -448,7 +375,6 @@ TFirmwarePackage_CheckResult(TFirmwarePackage *self, FirmwarePackage_CommandCall
   self->fCurrentCommand = command;
   self->fCommandCallback = in_callback;
   self->fCommandUserData = in_user_data;
-  self->fState = FWPKG_STATE_CHECKING;
   TRACE_LEAVE();
   return SSE_E_OK;
 
@@ -490,7 +416,6 @@ FirmwarePackage_New(void)
     LOG_ERROR("failed to FirmwarePackage_GetPackageDirPath().");
     goto error_exit;
   }
-  package->fState = FWPKG_STATE_DORMANT;
   package->fPackageFilePath = file_path;
   package->fPackageDirPath = dir_path;
   TRACE_LEAVE();

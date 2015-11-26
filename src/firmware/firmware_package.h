@@ -26,7 +26,6 @@ typedef struct TFirmwarePackage_ TFirmwarePackage;
 typedef sse_int (*FirmwarePackage_CommandCallback)(TFirmwarePackage *package, sse_int in_err, sse_char *in_err_info, sse_pointer in_user_data);
 
 struct TFirmwarePackage_ {
-  sse_int fState;
   sse_char *fPackageFilePath;
   sse_char *fPackageDirPath;
   TSseUtilShellCommand *fCurrentCommand;
