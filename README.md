@@ -3,93 +3,63 @@ ServiceSync Embedded Firmware App
 
 このアプリケーションは、ServiceSync Embedded Gatewayで動作するファームウェア更新のアプリケーションです。
 
-## ディレクトリ構成
-
-```
-${APP_ROOT}
-├── Makefile
-├── README.md
-├── certs .................... (1)
-├── common.gypi
-├── configure
-├── include
-│   └── servicesync .......... (2)
-├── moatapp.gyp
-├── package
-│   └── package.json
-├── src ...................... (3)
-├── test
-└── tools
-```
 
 ## ビルド手順
 
-### 事前準備
+### プラットフォーム証明書（moat.pem）の配置
 
-* プラットフォーム証明書`moat.pem`を、`certs`ディレクトリに予め配置しておく必要があります。
-  * プラットフォーム証明書は、動作環境(DMS等)に合わせて異なりますので、都度、環境に合わせて配置しなおしてください。
-* [iidn-cli](https://github.com/inventit/iidn-cli)をインストールする必要があります。
-  * インストール後、`iidn`コマンドに実行パスを通しておいてください。
-* アプリケーションをビルドするためには、API認証情報(appId/clientId/password)が必要です。予め、ServiceSyncのアカウントを取得してください。
+ゲートウェイパッケージに署名を行うために、プラットフォーム証明書（moat.pem）が必要です。プラットフォーム証明書はServiceSyncサーバー（DMS）毎に異なります。事前にシステム管理者より入手してください。
+
+moat.pemをssegw-file/certsにコピーしてください。
+
+```
+$ cd /path/to/ssegw-firmware
+$ cp /path/to/moat.pem ./certs
+```
 
 ### `token.bin`の生成
 
-```
-$ cd ${APP_ROOT}/package
-$ $ iidn tokengen firmware
-[IIDN] ** Using node... **
-[IIDN] Enter your appId:
-704dc8aa-xxxx-xxxx-xxxx-xxxxxxxxx
-[IIDN] Enter your clientId:
-admin@xxxxxxxxxxxxxxxxxxxxxxxxxxx
-[IIDN] Enter your password:
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
- ... (snip) ...
-
-[IIDN] Done
-```
-
-`iidn tokengen`を実行すると、実行したディレクトリに`1427021905250-token.bin`のようなファイル名で、トークンが生成されます。
-このファイル名を、`token.bin`に変更してください。
+ゲートウェイパッケージに署名をするために必要なトークン（token.bin）を取得します。取得方法は以下の通りです。
 
 ```
-.
-├── Makefile
-├── README.md
-├── certs
-│   └── moat.pem ....... (*)
-├── common.gypi
-├── configure
-├── include
-├── moatapp.gyp
-├── package
-│   ├── package.json
-│   └── token.bin ...... (*)
-├── src
-├── test
-└── tools
+$ cd package
+$ export SSDMS_PREFIX="YOUR SERVICESYNC DMS URL"
+$ export APP_ID="YOUR PP's APPLICATION ID"
+$ export CLIENT_ID="YOUR PP's CLIENT ID"
+$ export CLIENT_SECRET="YOUR PP's PASSWORD"
+$ export PACKAGE_ID="firmware"
+$ export TOKEN=`curl -v "${SSDMS_PREFIX}/moat/v1/sys/auth?a=${APP_ID}&u=${CLIENT_ID}&c=${CLIENT_SECRET}" | sed 's/\\\\\//\//g' | sed 's/[{}]//g' | awk -v k="text" '{n=split($0,a,","); for (i=1; i<=n; i++) print a[i]}' | sed 's/\"\:\"/\|/g' | sed 's/[\,]/ /g' | sed 's/\"//g' | grep -w 'accessToken' | cut -d"|" -f2 | sed -e 's/^ *//g' -e 's/ *$//g'`
+$ curl -v -o token.bin -L "${SSDMS_PREFIX}/moat/v1/sys/package/${PACKAGE_ID}?token=${TOKEN}&secureToken=true"
+$ cd ..
 ```
 
 ### ビルド
 
-```
-$ cd ${APP_ROOT}
-$ ./configure
-$ make
-```
+パッケージのビルド方法はゲートウェイ製品毎に異なります。以下の手順に従ってパッケージをビルドしてください。 `firmware_<VERSION>_<ARCH>_<PRODUCT>.zip` という名前のファイルが生成されます。
 
-### パッケージ作成
-
-Gatewayにインストール可能なパッケージを作成します。
-以下のコマンドを実行すると、`firmware_<version>_<arch>.zip`というファイル名のzipファイルが作成されます。
+#### 標準的なインテルPC
 
 ```
-$ make package
+debian$ ./configure
+debian$ make package
+```
+
+#### Armadillo-IoT
+
+```
+atde5$ export CROSS=arm-linux-gnueabi-
+atde5$ export CC=${CROSS}gcc
+atde5$ export CXX=${CROSS}g++
+atde5$ export AR=${CROSS}ar
+atde5$ export LD=${CROSS}ld
+atde5$ export RANLIB=${CROSS}ranlib
+atde5$ export STRIP=${CROSS}strip
+atde5$ ./configure --dest-cpu=arm --product=Armadillo-IoT
+atde5$ make package
 ```
 
 ## 変更履歴
 
-Changes in `0.0.1` : 2015/04/01
+Changes in `1.0.0` : 2015/11/30
 
 * Initial Release.
