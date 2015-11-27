@@ -210,8 +210,6 @@ error_exit:
   }
   err = (*self->fCommandCallback)(self, err, err_info, self->fCommandUserData);
   LOG_DEBUG("Callback result=%s", sse_get_error_string(err));
-  self->fCommandCallback = NULL;
-  self->fCommandUserData = NULL;
   TRACE_LEAVE();
   return err;
 }
@@ -221,6 +219,8 @@ FirmwarePackage_OnStartExtract(MoatIdle *in_idle, sse_pointer in_user_data)
 {
 
   TRACE_ENTER();
+  moat_idle_stop(in_idle);
+  moat_idle_free(in_idle);
   TFirmwarePackage_DoExtract((TFirmwarePackage *)in_user_data);
   TRACE_LEAVE();
 }
