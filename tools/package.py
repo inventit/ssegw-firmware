@@ -102,6 +102,7 @@ def run(args):
   package_name = variables.get('package_name')
   token_path = variables.get('token_path')
   arch = variables.get('target_arch')
+  product = variables.get('target_product')
 
   print 'creating a package of ' + package_name + '...'
   library_path = os.path.join(moat_root, 'out', arch, target_defaults.get('default_configuration'), 'lib.target')
@@ -124,7 +125,7 @@ def run(args):
     os.unlink(tmp_token_path)
   except OSError, e:
     if e.errno != errno.ENOENT: raise
-  if not package.archive(moat_path.PACKAGE_PATH, arch):
+  if not package.archive(moat_path.PACKAGE_PATH, arch, product):
     error_exit('failed to archive')
   if not package.sign(keystore.path):
     error_exit('failed to sign')

@@ -45,6 +45,11 @@ parser.add_option("--token",
     dest="token_path",
     help="Path to the security token file. Default path is \'./package/token.bin\'")
 
+parser.add_option("--product",
+    action="store",
+    dest="target_product",
+    help="M2M Gateway product to build for. Valid values are: generic, Armadillo-IoT, OpenBlocks-IoT, RaspberryPi.")
+
 (options, args) = parser.parse_args()
 
 def cc_macros():
@@ -186,8 +191,6 @@ def generate_skeleton(moat_path, package_name):
 def configure_moat(o):
   moat_path = moatutils.pathinfo(moat_root)
 
-  o['variables']['root'] = moat_root
-
   token_path = options.token_path
   if not token_path:
     token_path = os.path.join(moat_path.RESOURCES_PATH, 'token.bin')
@@ -240,6 +243,8 @@ def configure_app(o):
   moat_lib_dir = os.path.join(moat_root, 'test', target_arch, 'lib')
   o['library_dirs'] = [ moat_lib_dir ]
   o[ 'ldflags' ] = [ '-L' + moat_lib_dir ]
+
+  o['variables']['target_product'] = options.target_product if options.target_product in ['generic', 'Armadillo-IoT', 'OpenBlocks-IoT', 'RaspberryPi' ] else 'generic'
 
 output = {
   'variables': {},

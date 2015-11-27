@@ -1,0 +1,3 @@
+[submodule "moat-c-utils"]
+	path = moat-c-utils
+	url = https://github.com/inventit/moat-c-utils.git
