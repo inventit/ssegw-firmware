@@ -8,7 +8,7 @@ error_reboot_exit () {
 }
 #### functions ####
 
-img_pkg=kernel-img-obs*
+img_pkg=kernel-image-obs*
 dpkg -l "${img_pkg}" || { echo "failed to find '${img_pkg}' package."; exit 1; }
 
 cd $(dirname $0)
