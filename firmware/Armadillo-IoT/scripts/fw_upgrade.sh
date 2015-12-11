@@ -7,8 +7,8 @@ check_image_file () {
   md5sum -c $1.md5 || { echo "'$1': md5sum check failed"; exit 1 ; }
 }
 flash_image_file () {
-  [ -n "$1" ] || { return 0; }
-  netflash -b -k -n -u -s -r  $2 $1 || { echo "'$1:' netflash failed"; exit 1 ; }
+  [ -n "$2" ] || { return 0; }
+  netflash -b -k -n -u -s -r  $1 $2 || { echo "'$2:' netflash failed"; exit 1 ; }
 }
 #### functions ####
 
@@ -22,8 +22,8 @@ conf=firmware.conf
 check_image_file ${KERNEL}
 check_image_file ${USERLAND}
 
-flash_image_file ${KERNEL} /dev/flash/kernel
-flash_image_file ${USERLAND} /dev/flash/userland
+flash_image_file /dev/flash/kernel ${KERNEL}
+flash_image_file /dev/flash/userland ${USERLAND}
 
 #### successful ####
 reboot

@@ -317,6 +317,7 @@ TFirmwarePackage_Extract(TFirmwarePackage *self, FirmwarePackage_CommandCallback
   TRACE_ENTER();
   idle = moat_idle_new(FirmwarePackage_OnStartExtract, self);
   if (idle == NULL) {
+    err = SSE_E_NOMEM;
     LOG_ERROR("failed to moat_idle_new().");
     goto error_exit;
   }
