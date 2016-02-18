@@ -227,7 +227,7 @@ pi$ make package
 
 ## Gateway Package
 
-### `T.B.D.` T.B.D
+### `1.0.2` March 8, 2016
 
 * Fix firmware upgrade timeout in case of using the upgrade templeate for generic (restarting ServiceSync client only).
 
