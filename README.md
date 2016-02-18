@@ -227,6 +227,10 @@ pi$ make package
 
 ## Gateway Package
 
+### `T.B.D.` T.B.D
+
+* Fix firmware upgrade timeout in case of using the upgrade templeate for generic (restarting ServiceSync client only).
+
 ### `1.0.1` December 11, 2015
 
 * OpenBlocks IoT support
