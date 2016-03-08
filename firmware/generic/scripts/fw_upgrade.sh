@@ -14,6 +14,7 @@ error_exit () {
 
 cd $(dirname $0)
 
+sleep 3
 [ -f ${STOP_SCRIPT} ] || { error_exit "'${STOP_SCRIPT}' was not found."; }
 [ -f ${START_SCRIPT} ] || { error_exit "'${START_SCRIPT}' was not found."; }
 
